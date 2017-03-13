@@ -5,6 +5,7 @@
 rule token = parse
   [' ' '\t' '\r' '\n'] { token lexbuf } (* Whitespace *)
 | "/*"		{ comment lexbuf }           (* Comments *)
+| "\""		{ decaf_string lexbuf } (* Strings *)
 | '('		{ LPAREN }
 | ')'		{ RPAREN }
 | '{'		{ LBRACE }
@@ -49,20 +50,20 @@ rule token = parse
 | "->"		{ ARROW }
 | "@"		{ CONCAT }
 | "~" 		{ DEL }
-| "."		{ DECIMAL }
+| "."		{ DOT }
 | "in"		{ IN }
 | ":"		{ SPLICE }
 | "::"		{ APPEND }
 | "try"		{ TRY }
 | "catch"	{ CATCH }
 | "finally"	{ FINALLY }
+| "class"	{ CLASS }
 | "main"	{ MAIN }
 | "self"	{ SELF }
 | "null"	{ NULL }
 | "extends"	{ EXTENDS }
 | "implements"	{ IMPLEMENTS }
 | "const"	{ CONST }
-| "\""		{ DBLQUOTE }
 | ['0'-'9']+ as lxm { LITERAL(int_of_string lxm) }
 | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
 | eof { EOF }
@@ -71,3 +72,7 @@ rule token = parse
 and comment = parse
   "*/" { token lexbuf }
 | _    { comment lexbuf }
+
+and decaf_string = parse
+  "\""		{ token lexbuf }
+| _		{ decaf_string lexbuf }
