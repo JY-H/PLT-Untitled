@@ -4,20 +4,25 @@
 open Ast
 %}
 
-%token SEMI LPAREN RPAREN LBRACE RBRACE COMMA
-%token PLUS MINUS TIMES DIVIDE ASSIGN NOT
-%token EQ NEQ LT LEQ GT GEQ TRUE FALSE AND OR
-%token RETURN IF ELSE FOR WHILE INT BOOL VOID
-%token <int> LITERAL
+%token SEMI LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COMMA
+%token PLUS MINUS TIMES DIVIDE MOD ASSIGN NOT
+%token REQ VEQ RNEQ VNEQ LT LEQ GT GEQ TRUE FALSE AND OR
+%token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE INT BOOL VOID STRING CHAR FLOAT
+%token ARROW CONCAT DEL DOT IN SPLICE APPEND TRY CATCH FINALLY
+%token CLASS MAIN SELF NULL EXTENDS IMPLEMENTS CONST
+%token <int> INT_LIT
+%token <float> FLT_LIT
+%token <string> STR_LIT
 %token <string> ID
 %token EOF
 
 %nonassoc NOELSE
+%nonassoc ELSEIF
 %nonassoc ELSE
 %right ASSIGN
 %left OR
 %left AND
-%left EQ NEQ
+%left REQ RNEQ VEQ VNEQ
 %left LT GT LEQ GEQ
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -35,14 +40,15 @@ decls:
    /* nothing */ { [], [] }
  | decls vdecl { ($2 :: fst $1), snd $1 }
  | decls fdecl { fst $1, ($2 :: snd $1) }
+ | decls cdecl { (* TODO: Add a third list for classes *) }
 
 fdecl:
-   typ ID LPAREN formals_opt RPAREN LBRACE vdecl_list stmt_list RBRACE
-     { { typ = $1;
-	 fname = $2;
-	 formals = $4;
-	 locals = List.rev $7;
-	 body = List.rev $8 } }
+   ID LPAREN formals_opt RPAREN ARROW typ LBRACE vdecl_list stmt_list RBRACE
+     { { typ = $6;
+	 fname = $1;
+	 formals = $3;
+	 locals = List.rev $8;
+	 body = List.rev $9 } }
 
 formals_opt:
     /* nothing */ { [] }
@@ -56,6 +62,7 @@ typ:
     INT { Int }
   | BOOL { Bool }
   | VOID { Void }
+  | STRING { String }
 
 vdecl_list:
     /* nothing */    { [] }
@@ -63,6 +70,20 @@ vdecl_list:
 
 vdecl:
    typ ID SEMI { ($1, $2) }
+
+cdecl_list:
+    /* nothing */    { [] }
+  | cdecl_list cdecl { $2 :: $1 }
+
+cdecl:
+    CLASS ID LBRACE vdecl_list stmt_list RBRACE
+  | CLASS ID EXTENDS ID LBRACE vdecl_list stmt_list RBRACE
+  | CLASS ID IMPLEMENTS id_list LBRACE vdecl_list stmt_list RBRACE
+  | CLASS ID EXTENDS ID IMPLEMENTS id_list LBRACE vdecl_list stmt_list RBRACE
+
+id_list:
+    ID
+  | id_list COMMA ID
 
 stmt_list:
     /* nothing */  { [] }

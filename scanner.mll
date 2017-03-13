@@ -1,11 +1,14 @@
-(* Ocamllex scanner for MicroC *)
+(* Ocamllex scanner for DECAF *)
 
-{ open Parser }
+{
+   open Parser
+   let unescape s =
+	Scanf.sscanf("\"" ^ s ^ "\"") "%S%!" (fun x-> x)
+}
 
 rule token = parse
   [' ' '\t' '\r' '\n'] { token lexbuf } (* Whitespace *)
 | "/*"		{ comment lexbuf }           (* Comments *)
-| "\""		{ decaf_string lexbuf } (* Strings *)
 | '('		{ LPAREN }
 | ')'		{ RPAREN }
 | '{'		{ LBRACE }
@@ -20,9 +23,9 @@ rule token = parse
 | '/'		{ DIVIDE }
 | '%'		{ MOD }
 | '=' 		{ ASSIGN }
-| "=="		{ REFEQ }
+| "=="		{ REQ }
 | "==="		{ VEQ }
-| "!="		{ NEQ }
+| "!="		{ RNEQ }
 | "!=="		{ VNEQ }
 | '<'		{ LT }
 | "<="		{ LEQ }
@@ -64,15 +67,13 @@ rule token = parse
 | "extends"	{ EXTENDS }
 | "implements"	{ IMPLEMENTS }
 | "const"	{ CONST }
-| ['0'-'9']+ as lxm { LITERAL(int_of_string lxm) }
+| ['0'-'9']+ as lxm { INT_LIT(int_of_string lxm) }
+| ['0'-'9']+'.'['0'-'9']+ as lxm { FLT_LIT(float_of_string lxm) }
 | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
+| string { STR_LIT(unescape s) }
 | eof { EOF }
 | _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
 
 and comment = parse
   "*/" { token lexbuf }
 | _    { comment lexbuf }
-
-and decaf_string = parse
-  "\""		{ token lexbuf }
-| _		{ decaf_string lexbuf }
