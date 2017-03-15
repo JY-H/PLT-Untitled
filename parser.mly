@@ -18,7 +18,7 @@ open Ast
 %token <string> ID
 %token EOF
 
-%nonassoc NOELSE
+%nonassoc NOELSE NOELSEIF
 %nonassoc ELSEIF
 %nonassoc ELSE
 %right ASSIGN
@@ -102,10 +102,10 @@ formal_list:
 
 typ:
 	  INT		{ Int }
-	| BOOL	{ Bool }
-	| VOID	{ Void }
+	| BOOL		{ Bool }
+	| VOID		{ Void }
 	| STRING	{ String }
-	| FLOAT	{ Float }
+	| FLOAT		{ Float }
 	/* TODO: char? Keep or remove? */
 	/* TODO: put types in ast */
 	/* Note: MUST forbid nested types, or allow (int)[] and such? (will cause
@@ -140,10 +140,24 @@ stmt:
 	  expr SEMI { Expr $1 }
 	| RETURN SEMI { Return Noexpr }
 	| RETURN expr SEMI { Return $2 }
+	/* if */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSE
 		{ If($3, $6, Block([])) }
+	/* if-else*/
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE stmt_list
 		{ If($3, Block(List.rev $6), Block(List.rev $9)) }
+	/* if-elseif */
+	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
+	  elseifs
+	  %prec NOELSE
+		{ ElseIf($3, Block(List.rev $6), Elseifs(List.rev $8),
+		  Block(List.rev $11), Block([])) }
+	/* if-elseif-else */
+	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
+	  elseifs
+	  ELSE LBRACE stmt_list RBRACE
+		{ ElseIf($3, Block(List.rev $6), Elseifs( List.rev $8),
+		  Block(List.rev $11), Block(List.rev $17)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
 	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3, $6) }
@@ -152,14 +166,21 @@ stmt:
 	| CONST typ ID SEMI	{ LocalConst($2, $3) }
 	| CONST typ ID ASSIGN expr SEMI	{ LocalConst($2, $3, $5) }
 
+/* Note: likely to cause shift/reduce conflicts */
+elseifs:
+	ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE NOELSEIF
+		{ Elseif($3, $6) :: [] }
+	| ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE elseifs
+		{ Elseif($3, $6) :: $8 }
+
 expr_opt:
 	/* nothing */ { Noexpr }
 	| expr          { $1 }
 
 expr:
 	  INT_LIT			{ IntLit($1) }
-	| FLT_LIT			{ FltLit($1) }
-	| STR_LIT			{ StrLit($1) }
+	| FLT_LIT			{ FloatLit($1) }
+	| STR_LIT			{ StringLit($1) }
 	| TRUE				{ BoolLit(true) }
 	| FALSE				{ BoolLit(false) }
 	| ID				{ Id($1) }
@@ -178,6 +199,7 @@ expr:
 	| expr OR     expr	{ Binop($1, Or,    $3) }
 	| MINUS expr %prec NEG	{ Unop(Neg, $2) }
 	| NOT expr			{ Unop(Not, $2) }
+	| LT typ GT expr	{ Cast($1, $2) }
 	| ID ASSIGN expr	{ Assign($1, $3) }
 	| ID LPAREN actuals_opt RPAREN	{ Call($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
