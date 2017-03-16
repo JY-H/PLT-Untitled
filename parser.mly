@@ -37,12 +37,12 @@ open Ast
 %%
 
 program:
-	cdecls EOF { $1 }
+	cdecls EOF { Program($1) }
 
 cdecls:
 	/* TODO: allow empty program? */
-	/* nothing */ { [], [] }
-	cdecl_list	{ List.rev $1 }
+	  /* nothing */ { [], [] }
+	| cdecl_list	{ List.rev $1 }
 
 cdecl_list:
 	cdecl	{ [$1] }
@@ -67,11 +67,6 @@ cdecl:
 		interfaces = IdList($6)
 		cbody = $8 } }
 
-	CLASS ID LBRACE cbody RBRACE
-	{ {
-		cname = $2
-		cbody = $4 } }
-
 cbody:
 	/* nothing */	{ {
 		fields = [];
@@ -89,8 +84,7 @@ fdecl:
 		typ = $6;
 		fname = $1;
 		formals = $3;
-		locals = List.rev $8;
-		body = List.rev $9 } }
+		body = List.rev $8 } }
 
 formals_opt:
 	  /* nothing */ { [] }
@@ -120,10 +114,6 @@ tuple_typ:
 	typ LPAREN RPAREN	{ }
 */
 
-vdecl_list:
-	  /* nothing */    { [] }
-	| vdecl_list vdecl { $2 :: $1 }
-
 vdecl:
 	  typ ID SEMI	{ ObjVar($1, $2) }
 	| CONST typ ID SEMI	{ ObjConst($2, $3) }
@@ -143,24 +133,25 @@ stmt:
 	/* if */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSE
 		{ If($3, $6, Block([])) }
-	/* if-else*/
-	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE stmt_list
-		{ If($3, Block(List.rev $6), Block(List.rev $9)) }
 	/* if-elseif */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  %prec NOELSE
-		{ ElseIf($3, Block(List.rev $6), Elseifs(List.rev $8),
-		  Block(List.rev $11), Block([])) }
+		{ Elseif($3, Block(List.rev $6), Elseifs(List.rev $8), Block([])) }
 	/* if-elseif-else */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  ELSE LBRACE stmt_list RBRACE
-		{ ElseIf($3, Block(List.rev $6), Elseifs( List.rev $8),
-		  Block(List.rev $11), Block(List.rev $17)) }
+		{ Elseif($3, Block(List.rev $6), Elseifs(List.rev $8),
+		Block(List.rev $11)) }
+	/* if-else*/
+	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE LBRACE stmt_list RBRACE
+		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
 	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3, $6) }
+	| BREAK	SEMI { Break }
+	| CONTINUE SEMI { Continue }
 	| typ ID SEMI	{ LocalVar($1, $2) }
 	| typ ID ASSIGN expr SEMI	{ LocalVar($1, $2, $4) }
 	| CONST typ ID SEMI	{ LocalConst($2, $3) }
@@ -168,10 +159,10 @@ stmt:
 
 /* Note: likely to cause shift/reduce conflicts */
 elseifs:
-	ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE NOELSEIF
-		{ Elseif($3, $6) :: [] }
+	ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSEIF
+		{ Elseif($3, Block(List. rev $6)) :: [] }
 	| ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE elseifs
-		{ Elseif($3, $6) :: $8 }
+		{ Elseif($3, Block(List.rev $6)) :: $8 }
 
 expr_opt:
 	/* nothing */ { Noexpr }
@@ -184,22 +175,24 @@ expr:
 	| TRUE				{ BoolLit(true) }
 	| FALSE				{ BoolLit(false) }
 	| ID				{ Id($1) }
-	| expr PLUS   expr	{ Binop($1, Add,   $3) }
-	| expr MINUS  expr	{ Binop($1, Sub,   $3) }
-	| expr TIMES  expr	{ Binop($1, Mult,  $3) }
-	| expr DIVIDE expr	{ Binop($1, Div,   $3) }
-	| expr MOD	  expr	{ Binop($1, Mod,   $3) }
-	| expr EQ     expr	{ Binop($1, Equal, $3) }
-	| expr NEQ    expr	{ Binop($1, Neq,   $3) }
-	| expr LT     expr	{ Binop($1, Less,  $3) }
-	| expr LEQ    expr	{ Binop($1, Leq,   $3) }
-	| expr GT     expr	{ Binop($1, Greater, $3) }
-	| expr GEQ    expr	{ Binop($1, Geq,   $3) }
-	| expr AND    expr	{ Binop($1, And,   $3) }
-	| expr OR     expr	{ Binop($1, Or,    $3) }
+	| expr PLUS expr	{ Binop($1, Add, $3) }
+	| expr MINUS expr	{ Binop($1, Sub, $3) }
+	| expr TIMES expr	{ Binop($1, Mult, $3) }
+	| expr DIVIDE expr	{ Binop($1, Div, $3) }
+	| expr MOD expr		{ Binop($1, Mod, $3) }
+	| expr REQ expr		{ Binop($1, Req, $3) }
+	| expr VEQ expr		{ Binop($1, Veq, $3) }
+	| expr RNEQ expr	{ Binop($1, Rneq, $3) }
+	| expr VNEQ expr	{ Binop($1, Vneq, $3) }
+	| expr LT expr		{ Binop($1, Less, $3) }
+	| expr LEQ expr		{ Binop($1, Leq, $3) }
+	| expr GT expr		{ Binop($1, Greater, $3) }
+	| expr GEQ expr		{ Binop($1, Geq, $3) }
+	| expr AND expr		{ Binop($1, And, $3) }
+	| expr OR expr		{ Binop($1, Or, $3) }
 	| MINUS expr %prec NEG	{ Unop(Neg, $2) }
 	| NOT expr			{ Unop(Not, $2) }
-	| LT typ GT expr	{ Cast($1, $2) }
+	| LT typ GT expr	{ Cast($2, $4) }
 	| ID ASSIGN expr	{ Assign($1, $3) }
 	| ID LPAREN actuals_opt RPAREN	{ Call($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
