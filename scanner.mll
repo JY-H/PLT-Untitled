@@ -56,16 +56,12 @@ rule token = parse
 	| "true"	{ TRUE }
 	| "false"	{ FALSE }
 	| "->"		{ ARROW }
-	(* rename to AMP? *)
-	| "@"		{ CONCAT }
-	(* rename to TILDE? *)
-	| "~" 		{ DEL }
+	| "@"		{ AMP }
+	| "~" 		{ TILDE }
 	| "."		{ DOT }
 	| "in"		{ IN }
-	(* TODO: rename to SNGCOLON *)
-	| ":"		{ SPLICE }
-	(* TODO: rename to DBLCOLON*)
-	| "::"		{ APPEND }
+	| ":"		{ SNGCOLON }
+	| "::"		{ DBLCOLON }
 	| "try"		{ TRY }
 	| "catch"	{ CATCH }
 	| "finally"	{ FINALLY }
@@ -89,4 +85,4 @@ and comment = parse
 
 and singleLineComment = parse
  '\n'	{ token lexbuf }
-| _		{ singleComment lexbuf }
+| _		{ singleLineComment lexbuf }
