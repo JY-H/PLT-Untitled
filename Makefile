@@ -1,5 +1,5 @@
 
-default: scanner.ml parser ast parser.cmo parser.cmo
+default: scanner.ml parser ast sast semant parser.cmo parser.cmo
 
 scanner.cmo: scanner.ml
 	ocamlc -c scanner.ml
@@ -11,6 +11,12 @@ parser.cmo: parser.mli
 
 parser.ml: parser.mly
 	ocamlyacc parser.mly
+
+semant:
+	ocamlc -c semant.ml
+
+sast:
+	ocamlc -c sast.ml
 
 ast:
 	ocamlc -c ast.ml
