@@ -1,14 +1,25 @@
 
-default: scanner parser ast
+default: scanner.ml parser ast parser.cmo parser.cmo
 
-scanner:
-	ocamllex scanner.mll
+scanner.cmo: scanner.ml
+	ocamlc -c scanner.ml
 
-parser:
+parser.cmo: parser.mli
+	ocamlc -c parser.mli
+	ocamlc -c scanner.ml
+	ocamlc -c parser.ml
+
+parser.ml: parser.mly
 	ocamlyacc parser.mly
 
 ast:
-	ocamlc -c ast.m
+	ocamlc -c ast.ml
+
+parser:
+	ocamlyacc -v parser.mly
+
+scanner.ml: scanner.mll
+	ocamllex scanner.mll
 
 .PHONY: all
 all: clean scanner parser
