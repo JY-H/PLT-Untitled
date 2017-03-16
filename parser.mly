@@ -9,7 +9,7 @@
 %token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE
 %token INT BOOL VOID STRING CHAR FLOAT
 %token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON TRY CATCH FINALLY
-%token CLASS MAIN SELF NULL EXTENDS IMPLEMENTS CONST
+%token CLASS SELF NULL EXTENDS IMPLEMENTS CONST
 %token <int> INT_LIT
 %token <float> FLT_LIT
 %token <string> STR_LIT
@@ -120,11 +120,6 @@ tuple_typ:
 	typ LPAREN RPAREN	{ }
 */
 
-vdecl:
-	  typ ID SEMI	{ ObjVar($1, $2) }
-	| CONST typ ID SEMI	{ ObjConst($2, $3) }
-
-
 id_list_opt:
         /* nothing */ { Some [] }
         | id_list     { Some (List.rev $1) }
@@ -177,6 +172,7 @@ elseifs:
 	| ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE elseifs
 		{ Elseif($3, Block(List.rev $6)) :: $8 }
 
+/* TODO: Allow variable declaration within for loops*/
 expr_opt:
 	/* nothing */ { Noexpr }
 	| expr          { $1 }
@@ -209,6 +205,12 @@ expr:
 	| ID ASSIGN expr	{ Assign($1, $3) }
 	| ID LPAREN actuals_opt RPAREN	{ Call($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
+
+vdecl:
+	typ ID SEMI	{ ObjVar($1, $2, Noexpr) }
+	| typ ID ASSIGN expr SEMI	{ ObjVar($1, $2, $4) }
+	| CONST typ ID SEMI	{ ObjConst($2, $3, Noexpr) }
+	| CONST typ ID ASSIGN expr SEMI	{ ObjConst($2, $3, $5) }
 
 actuals_opt:
 	  /* nothing */ { [] }

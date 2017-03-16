@@ -11,8 +11,6 @@ type typ = Int | Float | Bool | String | Void (* | Tuple of typ | List of typ |
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
 
-type field = ObjVar of typ * string | ObjConst of typ * string
-
 type id_list = string list
 
 type expr =
@@ -42,6 +40,7 @@ type stmt =
 	| LocalVar of typ * string * expr
 	| LocalConst of typ * string * expr
 
+type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
 type func_decl = {
     typ: typ;
@@ -147,8 +146,8 @@ let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name
 
 let string_of_field = function
-	   ObjVar(t, name) -> string_of_typ t ^ " " ^ name
-	 | ObjConst(t, name) -> "const" ^ string_of_typ t ^ " " ^ name
+	   ObjVar(t, name, e) -> string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
+	 | ObjConst(t, name, e) -> "const" ^ string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
 
 let string_of_fdecl func_decl =
 	func_decl.fname ^ "(" ^

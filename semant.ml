@@ -18,12 +18,12 @@ let get_class_maps cdecls =
      let map_class map cdecl =
          (* Map all fields, const and non-const. *)
          let map_fields map = function 
-             ObjVar(typ, name) as field ->
+             ObjVar(typ, name, e) as field ->
                  if (StringMap.mem name map) then
                      raise (Failure(" duplicate field name: " ^ name))
                  else
                      StringMap.add name field map
-             |ObjConst(typ, name) as const_field ->
+             |ObjConst(typ, name, e) as const_field ->
                  if (StringMap.mem name map) then
                      raise (Failure(" duplicate const field name: " ^ name))
                  else

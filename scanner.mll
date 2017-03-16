@@ -66,7 +66,6 @@ rule token = parse
 	| "catch"	{ CATCH }
 	| "finally"	{ FINALLY }
 	| "class"	{ CLASS }
-	| "main"	{ MAIN }
 	| "self"	{ SELF }
 	| "null"	{ NULL }
 	| "extends"	{ EXTENDS }
