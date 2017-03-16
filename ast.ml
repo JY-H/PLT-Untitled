@@ -122,7 +122,7 @@ let rec string_of_stmt = function
 		string_of_stmt s
 	| If(e, s1, s2) -> "if (" ^ string_of_expr e ^ ") {\n" ^
 		string_of_stmt s1 ^ "\n}\nelse {\n" ^ string_of_stmt s2 ^
-                "\n}\n" 
+                "\n}\n"
 	| Elseif(e, s) -> "elseif (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s
 		^ "\n}\n"
 	| Elseifs(if_expr, if_stmt, elseifs, else_stmt) -> ""

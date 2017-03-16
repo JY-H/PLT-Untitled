@@ -144,8 +144,8 @@ stmt:
 	| RETURN SEMI { Return Noexpr }
 	| RETURN expr SEMI { Return $2 }
 	/* if */
-	| IF LPAREN expr RPAREN LBRACE stmt RBRACE %prec NOELSE
-		{ If($3, $6, Block([])) }
+	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSE
+		{ If($3, Block($6), Block([])) }
 	/* if-elseif */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
@@ -162,7 +162,7 @@ stmt:
 		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
-	| WHILE LPAREN expr RPAREN LBRACE stmt RBRACE { While($3, $6) }
+	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3, Block($6)) }
 	| BREAK	SEMI { Break }
 	| CONTINUE SEMI { Continue }
 	| typ ID SEMI	{ LocalVar($1, $2, Noexpr) }
