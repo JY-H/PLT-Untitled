@@ -1,0 +1,10 @@
+/* Tests the builtin float instantiation */
+
+class TestFloat {
+	main() -> int {
+		float a;
+		float b = 0.0;
+		float c = d = 5.0;
+		return 0;
+	}
+}
