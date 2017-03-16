@@ -13,8 +13,6 @@ type formal_param = Formal of typ * string
 
 type field = ObjVar of typ * string | ObjConst of typ * string
 
-type local = LocalVar of typ * string | LocalConst of typ * string
-
 type id_list = string list
 
 type expr =
@@ -41,15 +39,15 @@ type stmt =
 	| While of expr * stmt
 	| Break
 	| Continue
-	| LocalVar of typ * string
-	| LocalConst of typ * string
+	| LocalVar of typ * string * expr
+	| LocalConst of typ * string * expr
 
 
 type func_decl = {
     typ: typ;
     fname: string;
     formals: formal_param list;
-    locals: local list;
+    (* locals: local list; *)
     body: stmt list;
 }
 
@@ -61,6 +59,8 @@ type class_body = {
 type class_decl = {
 	cname: string;
 	cbody: class_body;
+        sclass: string option;
+        interfaces: id_list option;
 }
 
 type program = Program of class_decl list
@@ -120,8 +120,9 @@ let rec string_of_stmt = function
 	| Return(expr) -> "return " ^ string_of_expr expr ^ ";\n"
 	| If(e, s, Block([])) -> "if (" ^ string_of_expr e ^ ")\n" ^
 		string_of_stmt s
-	| If(e, s1, s2) ->  "if (" ^ string_of_expr e ^ ") {\n" ^
-		string_of_stmt s1 ^ "\n}\nelse {\n" ^ string_of_stmt s2 ^ "\n}\n"
+	| If(e, s1, s2) -> "if (" ^ string_of_expr e ^ ") {\n" ^
+		string_of_stmt s1 ^ "\n}\nelse {\n" ^ string_of_stmt s2 ^
+                "\n}\n" 
 	| Elseif(e, s) -> "elseif (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s
 		^ "\n}\n"
 	| Elseifs(if_expr, if_stmt, elseifs, else_stmt) -> ""
@@ -138,8 +139,9 @@ let rec string_of_stmt = function
 		"\n}\n"
 	| Break -> ""
 	| Continue -> ""
-	| LocalVar(t, id) -> string_of_typ t ^ " " ^ id ^ ";\n"
-	| LocalConst(t, id) -> "const" ^ string_of_typ t ^ " " ^ id ^ ";\n"
+	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
+	| LocalConst(t, id, e) -> "const" ^ string_of_typ t ^ " " ^ id ^ " " ^
+        string_of_expr e ^ ";\n"
 
 let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name

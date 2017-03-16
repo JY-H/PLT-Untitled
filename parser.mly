@@ -39,31 +39,39 @@ program:
 
 cdecls:
 	/* TODO: allow empty program? */
-	  /* nothing */ { [], [] }
-	| cdecl_list	{ List.rev $1 }
+	  /* nothing */ { [] } 
+        |  cdecl_list	{ List.rev $1 }
 
 cdecl_list:
 	cdecl	{ [$1] }
 	| cdecl_list cdecl	{ $2::$1 }
 
 cdecl:
+        /* TODO: It may be worth separating out the classes that have
+         * extensions/interfaces from those that don't. I'm a little wary of
+         * about what I wrote here...
+         */
 	CLASS ID LBRACE cbody RBRACE	{ {
-		cname = $2
-		cbody = $4 } }
+                cname = $2;
+		cbody = $4;
+                sclass = None;
+                interfaces = None } }
 	| CLASS ID EXTENDS ID LBRACE cbody RBRACE	{ {
-		cname = $2
-		sclass = $4
-		cbody = $6 } }
-	| CLASS ID IMPLEMENTS id_list LBRACE cbody RBRACE	{ {
-		cname = $2
-		interfaces = IdList($4)
-		cbody = $6 } }
-	| CLASS ID EXTENDS ID IMPLEMENTS id_list LBRACE cbody RBRACE
+                cname = $2;
+                cbody = $6;
+                sclass = Some $4;
+                interfaces = None } }
+	| CLASS ID IMPLEMENTS id_list_opt LBRACE cbody RBRACE	{ {
+                cname = $2;
+                cbody = $6;
+                sclass = None;
+                interfaces = $4 } }
+	| CLASS ID EXTENDS ID IMPLEMENTS id_list_opt LBRACE cbody RBRACE
 	{ {
-		cname = $2
-		sclass = $4
-		interfaces = IdList($6)
-		cbody = $8 } }
+                cname = $2;
+                cbody = $8;
+                sclass = Some $4;
+                interfaces = $6 } }
 
 cbody:
 	/* nothing */	{ {
@@ -116,9 +124,16 @@ vdecl:
 	  typ ID SEMI	{ ObjVar($1, $2) }
 	| CONST typ ID SEMI	{ ObjConst($2, $3) }
 
+
+id_list_opt:
+        /* nothing */ { Some [] }
+        | id_list     { Some (List.rev $1) }
+
+/* Note: Inconsistency here. We don't actually have an Id defined in the AST. So
+ * for now I'm just making this a list of strings. */
 id_list:
-	  ID				{ Id($1) }
-	| id_list COMMA ID	{ Id($1) }
+        ID			{ [$1] } 
+	| id_list COMMA ID	{ $3::$1 }
 
 stmt_list:
 	  /* nothing */  { [] }
@@ -129,7 +144,7 @@ stmt:
 	| RETURN SEMI { Return Noexpr }
 	| RETURN expr SEMI { Return $2 }
 	/* if */
-	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSE
+	| IF LPAREN expr RPAREN LBRACE stmt RBRACE %prec NOELSE
 		{ If($3, $6, Block([])) }
 	/* if-elseif */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
@@ -147,12 +162,12 @@ stmt:
 		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
-	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3, $6) }
+	| WHILE LPAREN expr RPAREN LBRACE stmt RBRACE { While($3, $6) }
 	| BREAK	SEMI { Break }
 	| CONTINUE SEMI { Continue }
-	| typ ID SEMI	{ LocalVar($1, $2) }
+	| typ ID SEMI	{ LocalVar($1, $2, Noexpr) }
 	| typ ID ASSIGN expr SEMI	{ LocalVar($1, $2, $4) }
-	| CONST typ ID SEMI	{ LocalConst($2, $3) }
+	| CONST typ ID SEMI	{ LocalConst($2, $3, Noexpr) }
 	| CONST typ ID ASSIGN expr SEMI	{ LocalConst($2, $3, $5) }
 
 /* Note: likely to cause shift/reduce conflicts */
