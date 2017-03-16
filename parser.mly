@@ -137,12 +137,12 @@ stmt:
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  %prec NOELSE
-		{ Elseif($3, Block(List.rev $6), Elseifs(List.rev $8), Block([])) }
+		{ Elseifs($3, Block(List.rev $6), List.rev $8, Block([])) }
 	/* if-elseif-else */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  ELSE LBRACE stmt_list RBRACE
-		{ Elseif($3, Block(List.rev $6), Elseifs(List.rev $8),
+		{ Elseifs($3, Block(List.rev $6), List.rev $8,
 		Block(List.rev $11)) }
 	/* if-else*/
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE LBRACE stmt_list RBRACE

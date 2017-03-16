@@ -12,4 +12,4 @@ all: clean scanner parser
 
 .PHONY: clean
 clean:
-	rm scanner.ml parser.mli parser.ml *.output
+	rm -f scanner.ml parser.mli parser.ml *.output *.cmo *.cmi
