@@ -15,45 +15,43 @@ type class_map = {
  * fields.
  *)
 let get_class_maps cdecls =
-     let map_class map cdecl =
-         (* Map all fields, const and non-const. *)
-         let map_fields map = function 
-             ObjVar(typ, name, e) as field ->
-                 if (StringMap.mem name map) then
-                     raise (Failure(" duplicate field name: " ^ name))
-                 else
-                     StringMap.add name field map
-             |ObjConst(typ, name, e) as const_field ->
-                 if (StringMap.mem name map) then
-                     raise (Failure(" duplicate const field name: " ^ name))
-                 else
-                     StringMap.add name const_field map
-         in
-    
-         (* Map all functions. *)
-         let map_functions map fdecl =
-             if (StringMap.mem fdecl.fname map) then
-                 raise (Failure(" duplicate function: " ^ fdecl.fname))
-             else
-                 StringMap.add fdecl.fname fdecl map
-         in
-         (* Map class names. *)
-         (
-         if (StringMap.mem cdecl.cname map) then
-             raise (Failure(" duplicate class name: " ^ cdecl.cname))
-         else
-             StringMap.add cdecl.cname
-             {
-                 fields = List.fold_left map_fields StringMap.empty
-                 cdecl.cbody.fields;
-                 functions = List.fold_left map_functions StringMap.empty
-                 cdecl.cbody.methods;
-                 class_decl = cdecl;
-             }
-             map
-         )
-     in List.fold_left map_class StringMap.empty cdecls
-             
+    let map_class map cdecl =
+        (* Map all fields, const and non-const. *)
+        let map_fields map = function 
+            ObjVar(typ, name, e) as field ->
+                if (StringMap.mem name map) then
+                    raise (Failure(" duplicate field name: " ^ name))
+                else
+                    StringMap.add name field map
+            | ObjConst(typ, name, e) as const_field ->
+                if (StringMap.mem name map) then
+                    raise (Failure(" duplicate const field name: " ^ name))
+                else
+                    StringMap.add name const_field map
+        in
+
+        (* Map all functions. *)
+        let map_functions map fdecl =
+            if (StringMap.mem fdecl.fname map) then
+                raise (Failure(" duplicate function: " ^ fdecl.fname))
+            else
+                StringMap.add fdecl.fname fdecl map
+        in
+        (* Map class names. *)
+        (
+        if (StringMap.mem cdecl.cname map) then
+            raise (Failure(" duplicate class name: " ^ cdecl.cname))
+        else
+            StringMap.add cdecl.cname
+            {
+                fields = List.fold_left map_fields StringMap.empty
+                    cdecl.cbody.fields;
+                functions = List.fold_left map_functions StringMap.empty
+                    cdecl.cbody.methods;
+                class_decl = cdecl;
+            } map
+        )
+    in List.fold_left map_class StringMap.empty cdecls
 
 let get_sast class_maps cdecls =
     let find_main = function
@@ -72,7 +70,6 @@ let get_sast class_maps cdecls =
     (* TODO: Add something to extract functions and replace [] with it. Line
      * 795. *)
     in get_main []
-
 
 let check (classes) = 
     let class_maps = get_class_maps classes

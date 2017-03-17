@@ -2,8 +2,9 @@
 
 {
 	open Parser
+	(* Currently unused, keeping for potential future use *)
 	let unescape s =
-		Scanf.sscanf("\"" ^ s ^ "\"") "%S%!" (fun x-> x)
+		Scanf.sscanf("'" ^ s ^ "'") "%S%!" (fun x-> x)
 }
 
 let ascii = ([' '-'!' '#'-'[' ']'-'~'])
@@ -50,8 +51,8 @@ rule token = parse
 	| "int"		{ INT }
 	| "bool" 	{ BOOL }
 	| "void"	{ VOID }
-	| "string"	{ STRING }
 	| "char"	{ CHAR }
+	| "string"	{ STRING }
 	| "float"	{ FLOAT }
 	| "true"	{ TRUE }
 	| "false"	{ FALSE }
@@ -74,7 +75,8 @@ rule token = parse
 	| ['0'-'9']+ as lxm { INT_LIT(int_of_string lxm) }
 	| ['0'-'9']+'.'['0'-'9']+ as lxm { FLT_LIT(float_of_string lxm) }
 	| ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
-	| '"'((ascii|escape))*'"' as s { STR_LIT(unescape s) }
+	| '''((ascii|escape))''' as c { CHAR_LIT(c.[1]) }
+	| '"'((ascii|escape))*'"' as s { STR_LIT(s) }
 	| eof { EOF }
 	| _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
 	

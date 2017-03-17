@@ -1,11 +1,13 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
+open Char
+
 type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 	Greater | Geq | And | Or
 
 type uop = Neg | Not
 
-type typ = Int | Float | Bool | String | Void (* | Tuple of typ | List of typ |
+type typ = Int | Float | Bool | Char | String | Void (* | Tuple of typ | List of typ |
 	Obj of ObjType *)
 
 (* typ ID, e.g. int x, int[] y *)
@@ -17,6 +19,7 @@ type expr =
 	  IntLit of int
 	| BoolLit of bool
 	| FloatLit of float
+	| CharLit of char
 	| StringLit of string
 	| Id of string
 	| Binop of expr * op * expr
@@ -72,6 +75,7 @@ let string_of_typ = function
 	| Bool -> "bool"
 	| String -> "string"
 	| Void -> "void"
+	| Char -> "char"
 
 let string_of_op = function
     Add -> "+"
@@ -87,8 +91,8 @@ let string_of_op = function
   | Leq -> "<="
   | Greater -> ">"
   | Geq -> ">="
-  | And -> "&&"
-  | Or -> "||"
+  | And -> "and"
+  | Or -> "or"
 
 let string_of_uop = function
     Neg -> "-"
@@ -101,6 +105,7 @@ let rec string_of_expr = function
   | FloatLit(f) -> string_of_float f
   | BoolLit(true) -> "true"
   | BoolLit(false) -> "false"
+  | CharLit(c) -> Char.escaped c
   | StringLit(s) -> s
   | Id(s) -> s
   | Binop(e1, o, e2) ->

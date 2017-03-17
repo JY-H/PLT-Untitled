@@ -12,6 +12,7 @@
 %token CLASS SELF NULL EXTENDS IMPLEMENTS CONST
 %token <int> INT_LIT
 %token <float> FLT_LIT
+%token <char> CHAR_LIT
 %token <string> STR_LIT
 %token <string> ID
 %token EOF
@@ -180,6 +181,7 @@ expr_opt:
 expr:
 	  INT_LIT			{ IntLit($1) }
 	| FLT_LIT			{ FloatLit($1) }
+	| CHAR_LIT			{ CharLit($1) }
 	| STR_LIT			{ StringLit($1) }
 	| TRUE				{ BoolLit(true) }
 	| FALSE				{ BoolLit(false) }
