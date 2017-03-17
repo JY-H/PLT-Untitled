@@ -10,10 +10,10 @@
 %token INT BOOL VOID STRING CHAR FLOAT
 %token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON TRY CATCH FINALLY
 %token CLASS SELF NULL EXTENDS IMPLEMENTS CONST
-%token <int> INT_LIT
-%token <float> FLT_LIT
-%token <char> CHAR_LIT
-%token <string> STR_LIT
+%token <int> INTLIT
+%token <float> FLTLIT
+%token <char> CHARLIT
+%token <string> STRLIT
 %token <string> ID
 %token EOF
 
@@ -41,38 +41,38 @@ program:
 cdecls:
 	/* TODO: allow empty program? */
 	  /* nothing */ { [] } 
-        |  cdecl_list	{ List.rev $1 }
+	| cdecl_list	{ List.rev $1 }
 
 cdecl_list:
-	cdecl	{ [$1] }
+	  cdecl	{ [$1] }
 	| cdecl_list cdecl	{ $2::$1 }
 
 cdecl:
-        /* TODO: It may be worth separating out the classes that have
-         * extensions/interfaces from those that don't. I'm a little wary of
-         * about what I wrote here...
-         */
-	CLASS ID LBRACE cbody RBRACE	{ {
-                cname = $2;
+		/* TODO: It may be worth separating out the classes that have
+		 * extensions/interfaces from those that don't. I'm a little wary of
+		 * about what I wrote here...
+		 */
+	  CLASS ID LBRACE cbody RBRACE	{ {
+		cname = $2;
 		cbody = $4;
-                sclass = None;
-                interfaces = None } }
+		sclass = None;
+		interfaces = None } }
 	| CLASS ID EXTENDS ID LBRACE cbody RBRACE	{ {
-                cname = $2;
-                cbody = $6;
-                sclass = Some $4;
-                interfaces = None } }
+		cname = $2;
+		cbody = $6;
+		sclass = Some $4;
+		interfaces = None } }
 	| CLASS ID IMPLEMENTS id_list_opt LBRACE cbody RBRACE	{ {
-                cname = $2;
-                cbody = $6;
-                sclass = None;
-                interfaces = $4 } }
+		cname = $2;
+		cbody = $6;
+		sclass = None;
+		interfaces = $4 } }
 	| CLASS ID EXTENDS ID IMPLEMENTS id_list_opt LBRACE cbody RBRACE
 	{ {
-                cname = $2;
-                cbody = $8;
-                sclass = Some $4;
-                interfaces = $6 } }
+		cname = $2;
+		cbody = $8;
+		sclass = Some $4;
+		interfaces = $6 } }
 
 cbody:
 	/* nothing */	{ {
@@ -158,13 +158,17 @@ stmt:
 		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
+	/*| FOR LPAREN local_decl SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
+		{ For ($3, $5, $7, Block(List.rev $10)) }*/
 	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3, Block($6)) }
 	| BREAK	SEMI { Break }
 	| CONTINUE SEMI { Continue }
-	| typ ID SEMI	{ LocalVar($1, $2, Noexpr) }
-	| typ ID ASSIGN expr SEMI	{ LocalVar($1, $2, $4) }
-	| CONST typ ID SEMI	{ LocalConst($2, $3, Noexpr) }
-	| CONST typ ID ASSIGN expr SEMI	{ LocalConst($2, $3, $5) }
+
+local_decl:
+	|  typ ID	{ LocalVar($1, $2, Noexpr) }
+	| typ ID ASSIGN expr	{ LocalVar($1, $2, $4) }
+	| CONST typ ID	{ LocalConst($2, $3, Noexpr) }
+	| CONST typ ID ASSIGN expr	{ LocalConst($2, $3, $5) }
 
 /* Note: likely to cause shift/reduce conflicts */
 elseifs:
@@ -179,10 +183,10 @@ expr_opt:
 	| expr          { $1 }
 
 expr:
-	  INT_LIT			{ IntLit($1) }
-	| FLT_LIT			{ FloatLit($1) }
-	| CHAR_LIT			{ CharLit($1) }
-	| STR_LIT			{ StringLit($1) }
+	  INTLIT			{ IntLit($1) }
+	| FLTLIT			{ FloatLit($1) }
+	| CHARLIT			{ CharLit($1) }
+	| STRLIT			{ StringLit($1) }
 	| TRUE				{ BoolLit(true) }
 	| FALSE				{ BoolLit(false) }
 	| ID				{ Id($1) }
@@ -204,12 +208,13 @@ expr:
 	| MINUS expr %prec NEG	{ Unop(Neg, $2) }
 	| NOT expr			{ Unop(Not, $2) }
 	| LT typ GT expr	{ Cast($2, $4) }
+	| local_decl		{ $1 }
 	| ID ASSIGN expr	{ Assign($1, $3) }
 	| ID LPAREN actuals_opt RPAREN	{ Call($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
 
 vdecl:
-	typ ID SEMI	{ ObjVar($1, $2, Noexpr) }
+	  typ ID SEMI	{ ObjVar($1, $2, Noexpr) }
 	| typ ID ASSIGN expr SEMI	{ ObjVar($1, $2, $4) }
 	| CONST typ ID SEMI	{ ObjConst($2, $3, Noexpr) }
 	| CONST typ ID ASSIGN expr SEMI	{ ObjConst($2, $3, $5) }
