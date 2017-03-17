@@ -24,8 +24,6 @@ type expr =
 	| Id of string
 	| Binop of expr * op * expr
 	| Unop of uop * expr
-	| LocalVar of typ * string * expr
-	| LocalConst of typ * string * expr
 	| Assign of string * expr
 	| Cast of typ * expr
 	| Call of string * expr list
@@ -42,6 +40,8 @@ type stmt =
 	| While of expr * stmt
 	| Break
 	| Continue
+	| LocalVar of typ * string * expr
+	| LocalConst of typ * string * expr
 
 type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
@@ -101,23 +101,21 @@ let string_of_uop = function
 let string_of_vdecl(t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
 
 let rec string_of_expr = function
-	  IntLit(l) -> string_of_int l
-	| FloatLit(f) -> string_of_float f
-	| BoolLit(true) -> "true"
-	| BoolLit(false) -> "false"
-	| CharLit(c) -> Char.escaped c
-	| StringLit(s) -> s
-	| Id(s) -> s
-	| Binop(e1, o, e2) ->
-		string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
-	| LocalVar(t, id, e) -> string_of_typ t ^ id ^ string_of_expr e
-	| LocalConst(t, id, e) -> string_of_typ t ^ id ^ string_of_expr e
-	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
-	| Assign(v, e) -> v ^ " = " ^ string_of_expr e
-	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
-	| Call(f, el) ->
-		f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
-	| Noexpr -> ""
+    IntLit(l) -> string_of_int l
+  | FloatLit(f) -> string_of_float f
+  | BoolLit(true) -> "true"
+  | BoolLit(false) -> "false"
+  | CharLit(c) -> Char.escaped c
+  | StringLit(s) -> s
+  | Id(s) -> s
+  | Binop(e1, o, e2) ->
+      string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+  | Unop(o, e) -> string_of_uop o ^ string_of_expr e
+  | Assign(v, e) -> v ^ " = " ^ string_of_expr e
+  | Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
+  | Call(f, el) ->
+      f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
+  | Noexpr -> ""
 
 let rec string_of_stmt = function
 	  Block(stmts) ->
@@ -145,6 +143,9 @@ let rec string_of_stmt = function
 		"\n}\n"
 	| Break -> ""
 	| Continue -> ""
+	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
+	| LocalConst(t, id, e) -> "const" ^ string_of_typ t ^ " " ^ id ^ " " ^
+        string_of_expr e ^ ";\n"
 
 let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name
