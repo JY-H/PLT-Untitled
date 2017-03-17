@@ -72,11 +72,11 @@ rule token = parse
 	| "extends"	{ EXTENDS }
 	| "implements"	{ IMPLEMENTS }
 	| "const"	{ CONST }
-	| ['0'-'9']+ as lxm { INT_LIT(int_of_string lxm) }
-	| ['0'-'9']+'.'['0'-'9']+ as lxm { FLT_LIT(float_of_string lxm) }
+	| ['0'-'9']+ as lxm { INTLIT(int_of_string lxm) }
+	| ['0'-'9']+'.'['0'-'9']+ as lxm { FLTLIT(float_of_string lxm) }
 	| ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
-	| '''((ascii|escape))''' as c { CHAR_LIT(c.[1]) }
-	| '"'((ascii|escape))*'"' as s { STR_LIT(s) }
+	| '''((ascii|escape))''' as c { CHARLIT(c.[1]) }
+	| '"'((ascii|escape))*'"' as s { STRLIT(s) }
 	| eof { EOF }
 	| _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
 	

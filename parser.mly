@@ -10,10 +10,10 @@
 %token INT BOOL VOID STRING CHAR FLOAT
 %token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON TRY CATCH FINALLY
 %token CLASS SELF NULL EXTENDS IMPLEMENTS CONST
-%token <int> INT_LIT
-%token <float> FLT_LIT
-%token <char> CHAR_LIT
-%token <string> STR_LIT
+%token <int> INTLIT
+%token <float> FLTLIT
+%token <char> CHARLIT
+%token <string> STRLIT
 %token <string> ID
 %token EOF
 
@@ -179,10 +179,10 @@ expr_opt:
 	| expr          { $1 }
 
 expr:
-	  INT_LIT			{ IntLit($1) }
-	| FLT_LIT			{ FloatLit($1) }
-	| CHAR_LIT			{ CharLit($1) }
-	| STR_LIT			{ StringLit($1) }
+	  INTLIT			{ IntLit($1) }
+	| FLTLIT			{ FloatLit($1) }
+	| CHARLIT			{ CharLit($1) }
+	| STRLIT			{ StringLit($1) }
 	| TRUE				{ BoolLit(true) }
 	| FALSE				{ BoolLit(false) }
 	| ID				{ Id($1) }
