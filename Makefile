@@ -27,9 +27,13 @@ parser:
 scanner.ml: scanner.mll
 	ocamllex scanner.mll
 
+.PHONY: menhir_test
+menhir_test:
+	./menhir_testall
+
 .PHONY: all
 all: clean scanner parser
 
 .PHONY: clean
 clean:
-	rm -f scanner.ml parser.mli parser.ml *.output *.cmo *.cmi
+	rm -f scanner.ml parser.mli parser.ml *.output *.cmo *.cmi tests/menhir_output.txt
