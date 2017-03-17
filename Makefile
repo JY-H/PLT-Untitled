@@ -36,4 +36,4 @@ all: clean scanner parser
 
 .PHONY: clean
 clean:
-	rm -f scanner.ml parser.mli parser.ml *.output *.cmo *.cmi tests/menhir_output.txt
+	rm -f scanner.ml parser.mli parser.ml *.output *.cmo *.cmi tests/menhir/menhir.output
