@@ -8,7 +8,7 @@ type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 type uop = Neg | Not
 
 type typ = Int | Float | Bool | Char | String | Void  |
-	Tuple of typ | List of typ (*| Obj of ObjType *)
+	Tuple of typ | Lst of typ (*| Obj of ObjType *)
 
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
@@ -28,7 +28,7 @@ type expr =
 	| Cast of typ * expr
 	| Call of string * expr list
 	| Noexpr
-	| ListCreate of expr list
+	| LstCreate of expr list
 	| TupleCreate of expr list
 	| SeqAccess of expr * expr * expr
 
@@ -80,7 +80,7 @@ let rec string_of_typ = function
 	| Void -> "void"
 	| Char -> "char"
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
-	| List(t) -> "[" ^ string_of_typ t ^ "]"
+	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
 
 let string_of_op = function
     Add -> "+"
@@ -122,7 +122,7 @@ let rec string_of_expr = function
 	| Call(f, el) ->
 	    f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
 	| Noexpr -> ""
-	| ListCreate(elems) -> "[" ^ String.concat ", " (List.map string_of_expr
+	| LstCreate(elems) -> "[" ^ String.concat ", " (List.map string_of_expr
 		elems) ^ "]"
 	| TupleCreate(elems) -> "(" ^ String.concat ", " (List.map string_of_expr
 	  	elems) ^ ")"

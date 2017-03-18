@@ -113,10 +113,10 @@ typ:
 	/* TODO: object type needed */
 
 list_typ:
-	LBRACK typ RBRACK	{ List($2) }
+	typ LBRACK RBRACK	{ Lst($1) }
 
 tuple_typ:
-	LPAREN typ RPAREN	{ Tuple($2) }
+	typ LPAREN RPAREN	{ Tuple($1) }
 
 id_list_opt:
 	/* nothing */ { Some [] }
@@ -196,7 +196,6 @@ expr:
 	| expr GEQ expr		{ Binop($1, Geq, $3) }
 	| expr AND expr		{ Binop($1, And, $3) }
 	| expr OR expr		{ Binop($1, Or, $3) }
-	| expr IN sequence	{ Binop($1, In, $3) }
 	| MINUS expr %prec NEG	{ Unop(Neg, $2) }
 	| NOT expr			{ Unop(Not, $2) }
 	| LT typ GT expr	{ Cast($2, $4) }
@@ -209,7 +208,7 @@ expr:
 
 sequence:
 	  LPAREN expr COMMA tuple_elems	{ TupleCreate(List.rev ($2 :: $4)) }
-	| LBRACK list_elems		{ ListCreate(List.rev $2) }
+	| LBRACK list_elems		{ LstCreate(List.rev $2) }
 
 tuple_elems:
 	  expr RPAREN { [$1] }
