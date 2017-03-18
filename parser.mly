@@ -86,9 +86,9 @@ cbody:
 		methods = $2 :: $1.methods } }
 
 fdecl:
-	ID LPAREN formals_opt RPAREN ARROW typ LBRACE stmt_list RBRACE
+	ID LPAREN formals_opt RPAREN ARROW return_typ LBRACE stmt_list RBRACE
 	{ {
-		typ = $6;
+		return_typ = $6;
 		fname = $1;
 		formals = $3;
 		body = List.rev $8 } }
@@ -102,15 +102,21 @@ formal_list:
 	| formal_list COMMA typ ID	{ Formal($3, $4) :: $1 }
 
 typ:
-	  INT		{ Int }
-	| CHAR		{ Char }
-	| BOOL		{ Bool }
-	| VOID		{ Void }
-	| STRING	{ String }
-	| FLOAT		{ Float }
+	  primitive { $1 }
 	| list_typ	{ $1 }
 	| tuple_typ	{ $1 }
 	/* TODO: object type needed */
+
+return_typ:
+	  VOID		{ Void }
+	| typ		{ $1 }
+
+primitive:
+	  INT		{ Int }
+	| CHAR		{ Char }
+	| BOOL		{ Bool }
+	| STRING	{ String }
+	| FLOAT		{ Float }
 
 list_typ:
 	typ LBRACK RBRACK	{ Lst($1) }

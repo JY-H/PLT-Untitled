@@ -49,7 +49,7 @@ type stmt =
 type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
 type func_decl = {
-    typ: typ;
+    return_typ: typ;
     fname: string;
     formals: formal_param list;
     (* locals: local list; *)
@@ -174,7 +174,7 @@ let string_of_field = function
 let string_of_fdecl func_decl =
 	func_decl.fname ^ "(" ^
 	String.concat ", " (List.map string_of_formal func_decl.formals) ^
-	") ->" ^ string_of_typ func_decl.typ ^ " {\n" ^
+	") ->" ^ string_of_typ func_decl.return_typ ^ " {\n" ^
 	String.concat "" (List.map string_of_stmt func_decl.body) ^ "}\n"
 
 let string_of_class class_decl =
