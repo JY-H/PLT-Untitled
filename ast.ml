@@ -3,12 +3,12 @@
 open Char
 
 type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
-	Greater | Geq | And | Or | In
+	Greater | Geq | And | Or | In | Append | Concat
 
-type uop = Neg | Not
+type uop = Neg | Not | Remove
 
-type typ = Int | Float | Bool | Char | String | Void  |
-	Tuple of typ | Lst of typ (*| Obj of ObjType *)
+type typ = Int | Float | Bool | Char | String | Void |
+	Tuple of typ | Lst of typ | Obj of string
 
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
@@ -22,15 +22,17 @@ type expr =
 	| CharLit of char
 	| StringLit of string
 	| Id of string
+	| Null
 	| Binop of expr * op * expr
 	| Unop of uop * expr
-	| Assign of string * expr
+	| Assign of expr * expr
 	| Cast of typ * expr
-	| Call of string * expr list
-	| Noexpr
+	| FieldAccess of expr * string
+	| MethodCall of expr * string * expr list
 	| LstCreate of expr list
 	| TupleCreate of expr list
 	| SeqAccess of expr * expr * expr
+	| Noexpr
 
 type stmt =
 	  Block of stmt list
@@ -81,6 +83,7 @@ let rec string_of_typ = function
 	| Char -> "char"
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
 	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
+	| Obj(id) -> id
 
 let string_of_op = function
     Add -> "+"
@@ -99,10 +102,13 @@ let string_of_op = function
   | And -> "and"
   | Or -> "or"
   | In -> "in"
+  | Append -> "::"
+  | Concat -> "@"
 
 let string_of_uop = function
     Neg -> "-"
-  | Not -> "not "
+  | Not -> "not"
+  | Remove -> "~"
 
 let string_of_vdecl(t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
 
@@ -114,13 +120,15 @@ let rec string_of_expr = function
 	| CharLit(c) -> Char.escaped c
 	| StringLit(s) -> s
 	| Id(s) -> s
+	| Null -> "null"
 	| Binop(e1, o, e2) ->
 	    string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
 	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
-	| Assign(v, e) -> v ^ " = " ^ string_of_expr e
+	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
 	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
-	| Call(f, el) ->
-	    f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
+	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ field
+	| MethodCall(obj, f,  el) ->
+	     string_of_expr obj ^ "." ^ f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
 	| Noexpr -> ""
 	| LstCreate(elems) -> "[" ^ String.concat ", " (List.map string_of_expr
 		elems) ^ "]"

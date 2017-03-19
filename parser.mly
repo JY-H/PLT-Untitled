@@ -17,17 +17,21 @@
 %token <string> ID
 %token EOF
 
-%nonassoc NOELSE NOELSEIF
+%nonassoc NOELSE NOELSEIF NOOBJECT
 %nonassoc ELSEIF
 %nonassoc ELSE
+%nonassoc ID
 %right ASSIGN
 %left OR
 %left AND
 %left REQ RNEQ VEQ VNEQ
 %left LT GT LEQ GEQ
+%right DBLCOLON TILDE AMP
 %left PLUS MINUS MOD
 %left TIMES DIVIDE
 %right NOT NEG
+%left LPAREN
+%left LBRACK
 %right DOT
 
 %start program
@@ -54,7 +58,7 @@ cdecl:
          */
 	CLASS ID LBRACE cbody RBRACE	{ {
                 cname = $2;
-		cbody = $4;
+				cbody = $4;
                 sclass = None;
                 interfaces = None } }
 	| CLASS ID EXTENDS ID LBRACE cbody RBRACE	{ {
@@ -88,9 +92,9 @@ cbody:
 fdecl:
 	ID LPAREN formals_opt RPAREN ARROW return_typ LBRACE stmt_list RBRACE
 	{ {
-		return_typ = $6;
 		fname = $1;
 		formals = $3;
+		return_typ = $6;
 		body = List.rev $8 } }
 
 formals_opt:
@@ -105,7 +109,7 @@ typ:
 	  primitive { $1 }
 	| list_typ	{ $1 }
 	| tuple_typ	{ $1 }
-	/* TODO: object type needed */
+	/*| obj_typ	{ $1 }*/
 
 return_typ:
 	  VOID		{ Void }
@@ -124,14 +128,15 @@ list_typ:
 tuple_typ:
 	typ LPAREN RPAREN	{ Tuple($1) }
 
+/*obj_typ:
+	ID					{ Obj($1) }*/
+
 id_list_opt:
 	/* nothing */ { Some [] }
 	| id_list     { Some (List.rev $1) }
 
-/* Note: Inconsistency here. We don't actually have an Id defined in the AST. So
- * for now I'm just making this a list of strings. */
 id_list:
-     ID			{ [$1] } 
+	  ID					{ [$1] } 
 	| id_list COMMA ID	{ $3 :: $1 }
 
 stmt_list:
@@ -161,13 +166,14 @@ stmt:
 		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
-	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3, Block($6)) }
+	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3,
+		Block(List.rev $6)) }
 	| BREAK	SEMI { Break }
 	| CONTINUE SEMI { Continue }
 	| typ ID SEMI	{ LocalVar($1, $2, Noexpr) }
 	| typ ID ASSIGN expr SEMI	{ LocalVar($1, $2, $4) }
-	| CONST typ ID SEMI	{ LocalConst($2, $3, Noexpr) }
-	| CONST typ ID ASSIGN expr SEMI	{ LocalConst($2, $3, $5) }
+	| CONST primitive ID SEMI	{ LocalConst($2, $3, Noexpr) }
+	| CONST primitive ID ASSIGN expr SEMI	{ LocalConst($2, $3, $5) }
 
 elseifs:
 	ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSEIF
@@ -180,13 +186,7 @@ expr_opt:
 	| expr          { $1 }
 
 expr:
-	  INTLIT			{ IntLit($1) }
-	| FLTLIT			{ FloatLit($1) }
-	| CHARLIT			{ CharLit($1) }
-	| STRLIT			{ StringLit($1) }
-	| TRUE				{ BoolLit(true) }
-	| FALSE				{ BoolLit(false) }
-	| ID				{ Id($1) }
+	  lits				{ $1 }
 	| expr PLUS expr	{ Binop($1, Add, $3) }
 	| expr MINUS expr	{ Binop($1, Sub, $3) }
 	| expr TIMES expr	{ Binop($1, Mult, $3) }
@@ -202,22 +202,36 @@ expr:
 	| expr GEQ expr		{ Binop($1, Geq, $3) }
 	| expr AND expr		{ Binop($1, And, $3) }
 	| expr OR expr		{ Binop($1, Or, $3) }
+	| expr DBLCOLON expr	{ Binop($1, Append, $3) }
+	| expr AMP expr		{ Binop($1, Concat, $3) }
 	| MINUS expr %prec NEG	{ Unop(Neg, $2) }
 	| NOT expr			{ Unop(Not, $2) }
+	| TILDE expr		{ Unop(Remove, $2) }
 	| LT typ GT expr	{ Cast($2, $4) }
-	| ID ASSIGN expr	{ Assign($1, $3) }
-	| ID LPAREN actuals_opt RPAREN	{ Call($1, $3) }
+	| expr ASSIGN expr	{ Assign($1, $3) }
+	| expr DOT ID	{ FieldAccess($1, $3) }
+	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
 	| LPAREN expr RPAREN	{ $2 }
 	| sequence	{ $1 }
-	| sequence LBRACK sequence_access RBRACK	{ SeqAccess($1, fst $3, snd $3) }
-	| ID LBRACK sequence_access RBRACK	{ SeqAccess(Id($1), fst $3, snd $3) }
+	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
+
+lits:
+	  INTLIT			{ IntLit($1) }
+	| FLTLIT			{ FloatLit($1) }
+	| CHARLIT			{ CharLit($1) }
+	| STRLIT			{ StringLit($1) }
+	| TRUE				{ BoolLit(true) }
+	| FALSE				{ BoolLit(false) }
+	| ID				{ Id($1) }
+	| NULL				{ Null }
 
 sequence:
 	  LPAREN expr COMMA tuple_elems	{ TupleCreate(List.rev ($2 :: $4)) }
 	| LBRACK list_elems		{ LstCreate(List.rev $2) }
 
 tuple_elems:
-	  expr RPAREN { [$1] }
+	  RPAREN	{ [] }
+	| expr RPAREN { [$1] }
 	| expr COMMA tuple_elems { $1 :: $3 }
 
 list_elems:
@@ -226,14 +240,14 @@ list_elems:
 	| expr COMMA list_elems	{ $1 :: $3 }
 
 sequence_access:
-	  expr	{ ($1, Noexpr) }
-	| expr SNGCOLON	expr { ($1, $3) }
+	  LBRACK expr RBRACK	{ ($2, Noexpr) }
+	| LBRACK expr SNGCOLON expr RBRACK	{ ($2, $4) }
 
 vdecl:
-	typ ID SEMI	{ ObjVar($1, $2, Noexpr) }
+	  typ ID SEMI	{ ObjVar($1, $2, Noexpr) }
 	| typ ID ASSIGN expr SEMI	{ ObjVar($1, $2, $4) }
-	| CONST typ ID SEMI	{ ObjConst($2, $3, Noexpr) }
-	| CONST typ ID ASSIGN expr SEMI	{ ObjConst($2, $3, $5) }
+	| CONST primitive ID SEMI	{ ObjConst($2, $3, Noexpr) }
+	| CONST primitive ID ASSIGN expr SEMI	{ ObjConst($2, $3, $5) }
 
 actuals_opt:
 	  /* nothing */ { [] }
