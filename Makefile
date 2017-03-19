@@ -12,16 +12,16 @@ parser.cmo: parser.mli
 parser.ml: parser.mly
 	ocamlyacc parser.mly
 
-semant:
+semant: semant.ml
 	ocamlc -c semant.ml
 
-sast:
+sast: sast.ml
 	ocamlc -c sast.ml
 
-ast:
+ast: ast.ml
 	ocamlc -c ast.ml
 
-parser:
+parser: parser.mly
 	ocamlyacc -v parser.mly
 
 scanner.ml: scanner.mll
@@ -29,7 +29,7 @@ scanner.ml: scanner.mll
 
 .PHONY: menhir_test
 menhir_test:
-	./menhir_testall
+	./menhir_testall.sh
 
 .PHONY: all
 all: clean scanner parser

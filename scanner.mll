@@ -32,7 +32,6 @@ rule token = parse
 	| "==="		{ VEQ }
 	| "!="		{ RNEQ }
 	| "!=="		{ VNEQ }
-	(* TODO: resolve LT vs LANGLE and GT vs RANGLE*)
 	| '<'		{ LT }
 	| "<="		{ LEQ }
 	| '>'		{ GT }

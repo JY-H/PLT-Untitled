@@ -25,6 +25,7 @@
 %left AND
 %left REQ RNEQ VEQ VNEQ
 %left LT GT LEQ GEQ
+%left IN
 %right DBLCOLON TILDE AMP
 %left PLUS MINUS MOD
 %left TIMES DIVIDE
@@ -203,6 +204,7 @@ expr:
 	| expr OR expr		{ Binop($1, Or, $3) }
 	| expr DBLCOLON expr	{ Binop($1, Append, $3) }
 	| expr AMP expr		{ Binop($1, Concat, $3) }
+	| expr IN expr		{ Binop($1, In, $3) }
 	| MINUS expr %prec NEG	{ Unop(Neg, $2) }
 	| NOT expr			{ Unop(Not, $2) }
 	| TILDE expr		{ Unop(Remove, $2) }
