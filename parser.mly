@@ -14,13 +14,12 @@
 %token <float> FLTLIT
 %token <char> CHARLIT
 %token <string> STRLIT
-%token <string> ID
+%token <string> ID CLASSID
 %token EOF
 
 %nonassoc NOELSE NOELSEIF NOOBJECT
 %nonassoc ELSEIF
 %nonassoc ELSE
-%nonassoc ID
 %right ASSIGN
 %left OR
 %left AND
@@ -56,22 +55,22 @@ cdecl:
          * extensions/interfaces from those that don't. I'm a little wary of
          * about what I wrote here...
          */
-	CLASS ID LBRACE cbody RBRACE	{ {
+	CLASS CLASSID LBRACE cbody RBRACE	{ {
                 cname = $2;
 				cbody = $4;
                 sclass = None;
                 interfaces = None } }
-	| CLASS ID EXTENDS ID LBRACE cbody RBRACE	{ {
+	| CLASS CLASSID EXTENDS CLASSID LBRACE cbody RBRACE	{ {
                 cname = $2;
                 cbody = $6;
                 sclass = Some $4;
                 interfaces = None } }
-	| CLASS ID IMPLEMENTS id_list_opt LBRACE cbody RBRACE	{ {
+	| CLASS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody RBRACE	{ {
                 cname = $2;
                 cbody = $6;
                 sclass = None;
                 interfaces = $4 } }
-	| CLASS ID EXTENDS ID IMPLEMENTS id_list_opt LBRACE cbody RBRACE
+	| CLASS CLASSID EXTENDS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody RBRACE
 	{ {
                 cname = $2;
                 cbody = $8;
@@ -109,7 +108,7 @@ typ:
 	  primitive { $1 }
 	| list_typ	{ $1 }
 	| tuple_typ	{ $1 }
-	/*| obj_typ	{ $1 }*/
+	| obj_typ	{ $1 }
 
 return_typ:
 	  VOID		{ Void }
@@ -128,16 +127,16 @@ list_typ:
 tuple_typ:
 	typ LPAREN RPAREN	{ Tuple($1) }
 
-/*obj_typ:
-	ID					{ Obj($1) }*/
+obj_typ:
+	CLASSID				{ Obj($1) }
 
-id_list_opt:
+classid_list_opt:
 	/* nothing */ { Some [] }
-	| id_list     { Some (List.rev $1) }
+	| classid_list     { Some (List.rev $1) }
 
-id_list:
-	  ID					{ [$1] } 
-	| id_list COMMA ID	{ $3 :: $1 }
+classid_list:
+	  CLASSID					{ [$1] } 
+	| classid_list COMMA CLASSID	{ $3 :: $1 }
 
 stmt_list:
 	  /* nothing */  { [] }

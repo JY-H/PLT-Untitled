@@ -74,7 +74,8 @@ rule token = parse
 	| "const"	{ CONST }
 	| ['0'-'9']+ as lxm { INTLIT(int_of_string lxm) }
 	| ['0'-'9']+'.'['0'-'9']+ as lxm { FLTLIT(float_of_string lxm) }
-	| ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
+	| ['a'-'z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
+	| ['A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { CLASSID(lxm) }
 	| '''((ascii|escape))''' as c { CHARLIT(c.[1]) }
 	| '"'((ascii|escape))*'"' as s { STRLIT(s) }
 	| eof { EOF }
