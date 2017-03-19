@@ -55,6 +55,7 @@ rule token = parse
 	| "float"	{ FLOAT }
 	| "true"	{ TRUE }
 	| "false"	{ FALSE }
+	| "null"	{ NULL }
 	| "->"		{ ARROW }
 	| "@"		{ AMP }
 	| "~" 		{ TILDE }
@@ -67,7 +68,7 @@ rule token = parse
 	| "finally"	{ FINALLY }
 	| "class"	{ CLASS }
 	| "self"	{ SELF }
-	| "null"	{ NULL }
+	| "super"	{ SUPER }
 	| "extends"	{ EXTENDS }
 	| "implements"	{ IMPLEMENTS }
 	| "const"	{ CONST }

@@ -7,9 +7,9 @@
 %token PLUS MINUS TIMES DIVIDE MOD ASSIGN
 %token REQ VEQ RNEQ VNEQ LT LEQ GT GEQ TRUE FALSE AND OR NOT
 %token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE
-%token INT BOOL VOID STRING CHAR FLOAT
+%token INT BOOL VOID STRING CHAR FLOAT NULL
 %token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON TRY CATCH FINALLY
-%token CLASS SELF NULL EXTENDS IMPLEMENTS CONST
+%token CLASS SELF SUPER EXTENDS IMPLEMENTS CONST
 %token <int> INTLIT
 %token <float> FLTLIT
 %token <char> CHARLIT
@@ -216,6 +216,8 @@ expr:
 	| expr DOT ID	{ FieldAccess($1, $3) }
 	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
 	| obj_typ LPAREN actuals_opt RPAREN	{ ObjCreate($1, $3) }
+	| SELF				{ Self }
+	| SUPER LPAREN actuals_opt RPAREN	{ Super($3) }
 
 lits:
 	  INTLIT			{ IntLit($1) }

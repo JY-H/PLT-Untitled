@@ -33,6 +33,8 @@ type expr =
 	| SeqAccess of expr * expr * expr
 	| MethodCall of expr * string * expr list
 	| ObjCreate of typ * expr list
+	| Self
+	| Super of expr list
 	| Noexpr
 
 type stmt =
@@ -141,6 +143,8 @@ let rec string_of_expr = function
 	     string_of_expr obj ^ "." ^ f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
 	| ObjCreate(obj, args) ->
 		string_of_typ obj ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+	| Self -> "self"
+	| Super(args) -> "super(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
 	| Noexpr -> ""
 
 let rec string_of_stmt = function
