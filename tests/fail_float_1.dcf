@@ -1,0 +1,7 @@
+/* Fail on attempt to assign int to float. */
+
+class FailInt {
+	main() -> int {
+		float a = 5;
+	}
+}

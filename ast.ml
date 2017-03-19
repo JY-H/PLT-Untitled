@@ -1,103 +1,202 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
-type op = Add | Sub | Mult | Div | Equal | Neq | Less | Leq | Greater | Geq |
-          And | Or
+open Char
 
-type uop = Neg | Not
+type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
+	Greater | Geq | And | Or | In | Append | Concat
 
-type typ = Int | Bool | Void
+type uop = Neg | Not | Remove
 
-type bind = typ * string
+type typ = Int | Float | Bool | Char | String | Void |
+	Tuple of typ | Lst of typ | Obj of string
+
+(* typ ID, e.g. int x, int[] y *)
+type formal_param = Formal of typ * string
+
+type id_list = string list
 
 type expr =
-    Literal of int
-  | BoolLit of bool
-  | Id of string
-  | Binop of expr * op * expr
-  | Unop of uop * expr
-  | Assign of string * expr
-  | Call of string * expr list
-  | Noexpr
+	  IntLit of int
+	| BoolLit of bool
+	| FloatLit of float
+	| CharLit of char
+	| StringLit of string
+	| Id of string
+	| Null
+	| Binop of expr * op * expr
+	| Unop of uop * expr
+	| Assign of expr * expr
+	| Cast of typ * expr
+	| FieldAccess of expr * string
+	| LstCreate of expr list
+	| TupleCreate of expr list
+	| SeqAccess of expr * expr * expr
+	| MethodCall of expr * string * expr list
+	| ObjCreate of typ * expr list
+	| Self
+	| Super of expr list
+	| Noexpr
 
 type stmt =
-    Block of stmt list
-  | Expr of expr
-  | Return of expr
-  | If of expr * stmt * stmt
-  | For of expr * expr * expr * stmt
-  | While of expr * stmt
+	  Block of stmt list
+	| Expr of expr
+	| Return of expr
+	| If of expr * stmt * stmt
+	| Elseif of expr * stmt
+	| Elseifs of expr * stmt * stmt list * stmt
+	| For of expr * expr * expr * stmt
+	| While of expr * stmt
+	| Break
+	| Continue
+	| LocalVar of typ * string * expr
+	| LocalConst of typ * string * expr
+
+type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
 type func_decl = {
-    typ : typ;
-    fname : string;
-    formals : bind list;
-    locals : bind list;
-    body : stmt list;
-  }
+    return_typ: typ;
+    fname: string;
+    formals: formal_param list;
+    (* locals: local list; *)
+    body: stmt list;
+}
 
-type program = bind list * func_decl list
+type class_body = {
+	fields: field list;
+	methods: func_decl list;
+}
+
+type class_decl = {
+	cname: string;
+	cbody: class_body;
+        sclass: string option;
+        interfaces: id_list option;
+}
+
+type program = Program of class_decl list
 
 (* Pretty-printing functions *)
+
+let rec string_of_typ = function
+	  Int -> "int"
+	| Float -> "float"
+	| Bool -> "bool"
+	| String -> "string"
+	| Void -> "void"
+	| Char -> "char"
+	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
+	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
+	| Obj(id) -> id
 
 let string_of_op = function
     Add -> "+"
   | Sub -> "-"
   | Mult -> "*"
   | Div -> "/"
-  | Equal -> "=="
-  | Neq -> "!="
+  | Mod -> "%"
+  | Req -> "=="
+  | Veq -> "==="
+  | Rneq -> "!="
+  | Vneq -> "!=="
   | Less -> "<"
   | Leq -> "<="
   | Greater -> ">"
   | Geq -> ">="
-  | And -> "&&"
-  | Or -> "||"
+  | And -> "and"
+  | Or -> "or"
+  | In -> "in"
+  | Append -> "::"
+  | Concat -> "@"
 
 let string_of_uop = function
     Neg -> "-"
-  | Not -> "!"
+  | Not -> "not"
+  | Remove -> "~"
+
+let string_of_vdecl(t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
 
 let rec string_of_expr = function
-    Literal(l) -> string_of_int l
-  | BoolLit(true) -> "true"
-  | BoolLit(false) -> "false"
-  | Id(s) -> s
-  | Binop(e1, o, e2) ->
-      string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
-  | Unop(o, e) -> string_of_uop o ^ string_of_expr e
-  | Assign(v, e) -> v ^ " = " ^ string_of_expr e
-  | Call(f, el) ->
-      f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
-  | Noexpr -> ""
+	  IntLit(l) -> string_of_int l
+	| FloatLit(f) -> string_of_float f
+	| BoolLit(true) -> "true"
+	| BoolLit(false) -> "false"
+	| CharLit(c) -> Char.escaped c
+	| StringLit(s) -> s
+	| Id(s) -> s
+	| Null -> "null"
+	| Binop(e1, o, e2) ->
+	    string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
+	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
+	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
+	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ field
+	| LstCreate(elems) -> "[" ^ String.concat ", " (List.map string_of_expr
+		elems) ^ "]"
+	| TupleCreate(elems) -> "(" ^ String.concat ", " (List.map string_of_expr
+	  	elems) ^ ")"
+	| SeqAccess(sequence, start_index, end_index) -> string_of_expr sequence ^
+		"[" ^ string_of_expr start_index ^ (match end_index with
+		  Noexpr -> ""
+		| _ -> ": " ^ string_of_expr end_index)
+		^ "]"
+	| MethodCall(obj, f, el) ->
+	     string_of_expr obj ^ "." ^ f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
+	| ObjCreate(obj, args) ->
+		string_of_typ obj ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+	| Self -> "self"
+	| Super(args) -> "super(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+	| Noexpr -> ""
 
 let rec string_of_stmt = function
-    Block(stmts) ->
-      "{\n" ^ String.concat "" (List.map string_of_stmt stmts) ^ "}\n"
-  | Expr(expr) -> string_of_expr expr ^ ";\n";
-  | Return(expr) -> "return " ^ string_of_expr expr ^ ";\n";
-  | If(e, s, Block([])) -> "if (" ^ string_of_expr e ^ ")\n" ^ string_of_stmt s
-  | If(e, s1, s2) ->  "if (" ^ string_of_expr e ^ ")\n" ^
-      string_of_stmt s1 ^ "else\n" ^ string_of_stmt s2
-  | For(e1, e2, e3, s) ->
-      "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
-      string_of_expr e3  ^ ") " ^ string_of_stmt s
-  | While(e, s) -> "while (" ^ string_of_expr e ^ ") " ^ string_of_stmt s
+	  Block(stmts) ->
+		"{\n" ^ String.concat "" (List.map string_of_stmt stmts) ^ "}\n"
+	| Expr(expr) -> string_of_expr expr ^ ";\n"
+	| Return(expr) -> "return " ^ string_of_expr expr ^ ";\n"
+	| If(e, s, Block([])) -> "if (" ^ string_of_expr e ^ ")\n" ^
+		string_of_stmt s
+	| If(e, s1, s2) -> "if (" ^ string_of_expr e ^ ") {\n" ^
+		string_of_stmt s1 ^ "\n}\nelse {\n" ^ string_of_stmt s2 ^
+                "\n}\n"
+	| Elseif(e, s) -> "elseif (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s
+		^ "\n}\n"
+	| Elseifs(if_expr, if_stmt, elseifs, else_stmt) ->
+		"if (" ^ string_of_expr if_expr ^ ") {\n" ^ string_of_stmt if_stmt ^
+		"\n}\n" ^ String.concat "\n" (List.map string_of_elseif elseifs) ^
+		"else {\n" ^ string_of_stmt else_stmt ^ "\n}\n"
+	| For(e1, e2, e3, s) ->
+	    "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
+		string_of_expr e3  ^ ") {\n" ^ string_of_stmt s ^ "\n}\n"
+	| While(e, s) -> "while (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s ^
+		"\n}\n"
+	| Break -> ""
+	| Continue -> ""
+	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
+	| LocalConst(t, id, e) -> "const" ^ string_of_typ t ^ " " ^ id ^ " " ^
+        string_of_expr e ^ ";\n"
 
-let string_of_typ = function
-    Int -> "int"
-  | Bool -> "bool"
-  | Void -> "void"
+and string_of_elseif = function
+	  Elseif(expr, stmt) -> "elseif (" ^ string_of_expr expr ^ ") {\n" ^
+		string_of_stmt stmt ^ "\n}\n"
+	| _ -> ""
 
-let string_of_vdecl (t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
+let string_of_formal = function
+	  Formal(t, name) -> string_of_typ t ^ " " ^ name
 
-let string_of_fdecl fdecl =
-  string_of_typ fdecl.typ ^ " " ^
-  fdecl.fname ^ "(" ^ String.concat ", " (List.map snd fdecl.formals) ^
-  ")\n{\n" ^
-  String.concat "" (List.map string_of_vdecl fdecl.locals) ^
-  String.concat "" (List.map string_of_stmt fdecl.body) ^
-  "}\n"
+let string_of_field = function
+	   ObjVar(t, name, e) -> string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
+	 | ObjConst(t, name, e) -> "const" ^ string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
 
-let string_of_program (vars, funcs) =
-  String.concat "" (List.map string_of_vdecl vars) ^ "\n" ^
-  String.concat "\n" (List.map string_of_fdecl funcs)
+let string_of_fdecl func_decl =
+	func_decl.fname ^ "(" ^
+	String.concat ", " (List.map string_of_formal func_decl.formals) ^
+	") ->" ^ string_of_typ func_decl.return_typ ^ " {\n" ^
+	String.concat "" (List.map string_of_stmt func_decl.body) ^ "}\n"
+
+let string_of_class class_decl =
+	"class " ^ class_decl.cname ^ " {\n" ^
+	String.concat "" (List.map string_of_field class_decl.cbody.fields) ^ "\n" ^
+	String.concat "\n" (List.map string_of_fdecl class_decl.cbody.methods) ^
+	"\n}\n"
+
+let string_of_program program = match program with
+	Program cdecls -> String.concat "" (List.map string_of_class cdecls)

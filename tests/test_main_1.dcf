@@ -1,0 +1,10 @@
+/* 
+ * Tests that class declarations will compile just the main method and no
+ * statements (except return, which is necessary).
+ */
+
+class TestMain {
+	main() -> int {
+		return 0;
+	}
+}

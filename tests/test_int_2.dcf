@@ -1,0 +1,13 @@
+/* Tests the int literal operations */
+
+class TestInt {
+	main() -> int {
+		int a;				// a = 0
+		int b = 1;
+		int c = d = b * 3;	// c = d = 3
+		a = b + c * d;		// a = 10
+		a = a - b;			// a = 9
+		b = a % c;			// b = 0
+		return 0;
+	}
+}

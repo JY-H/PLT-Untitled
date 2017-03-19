@@ -1,0 +1,7 @@
+/* Fail on just int literal. */
+
+class FailInt {
+	main() -> int {
+		5;
+	}
+}

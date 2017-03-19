@@ -17,33 +17,64 @@ module A = Ast
 
 module StringMap = Map.Make(String)
 
-let translate (globals, functions) =
   let context = L.global_context () in
-  let the_module = L.create_module context "MicroC"
-  and i32_t  = L.i32_type  context
-  and i8_t   = L.i8_type   context
-  and i1_t   = L.i1_type   context
-  and void_t = L.void_type context in
+  let the_module = L.create_module context "DECAF"
+  let i32_t  = L.i32_type  context
+  let i64_t  = L.i64_type  context
+  let i8_t   = L.i8_type   context
+  let i1_t   = L.i1_type   context
+  let void_t = L.void_type context
+  let char_t = L.i8_type   context
+  let str_t  = L.pointer_type i8_t
+
+    (* Insert hashtables here *)
 
   let ltype_of_typ = function
       A.Int -> i32_t
+    | A.Float -> i64_t
     | A.Bool -> i1_t
-    | A.Void -> void_t in
+    | A.Void -> void_t
+    | A.Char -> char_t in
 
-  (* Declare each global variable; remember its value in a map *)
-  let global_vars =
-    let global_var m (t, n) =
-      let init = L.const_int (ltype_of_typ t) 0
-      in StringMap.add n (L.define_global n init the_module) m in
-    List.fold_left global_var StringMap.empty globals in
+    let handle_binop e1 op e2 data_t llbuilder =
+        let int_ops e1 op e2 =
+            match op with
+                  Add     -> L.build_add e1 e2 "int_add" llbuilder
+                | Sub     -> L.build_sub e1 e2 "int_sub" llbuilder
+                | Mult    -> L.build_mul e1 e2 "int_mult" llbuilder
+                | Div     -> L.build_sdiv e1 e2 "int_div" llbuilder
+                | Mod     -> L.build_srem e1 e2 "int_mod" llbuilder
+                | Veq     -> L.build_icmp L.Icmp.Eq e1 e2 "int_veq" llbuilder
+                | Vneq    -> L.build_icmp L.Icmp.Ne e1 e2 "int_vneq" llbuilder
+                | Less    -> L.build_icmp L.Icmp.Slt e1 e2 "int_less" llbuilder
+                | Leq     -> L.build_icmp L.Icmp.Sle e1 e2 "int_leq" llbuilder
+                | Greater -> L.build_icmp L.Icmp.Sgt e1 e2 "int_greater" llbuilder
+                | Geq     -> L.build_icmp L.Icmp.Sge e1 e2 "int_geq" llbuilder
+                | And     -> L.build_and e1 e2 "int_and" llbuilder
+                | Or      -> L.build_or e1 e2 "int_or" llbuilder
+        in
+        let float_ops e1 op e2 =
+            match op with
+                  Add     -> L.build_fadd e1 e2 "flt_add" llbuilder
+                | Sub     -> L.build_fsub e1 e2 "flt_sub" llbuilder
+                | Mult    -> L.build_fmul e1 e2 "flt_mult" llbuilder
+                | Div     -> L.build_fdiv e1 e2 "flt_div" llbuilder
+                | Mod     -> L.build_frem e1 e2 "flt_mod" llbuilder
+                | Veq     -> L.build_fcmp L.Fcmp.Eq e1 e2 "flt_veq" llbuilder
+                | Vneq    -> L.build_fcmp L.Fcmp.Ne e1 e2 "flt_vneq" llbuilder
+                | Less    -> L.build_fcmp L.Fcmp.Ult e1 e2 "flt_less" llbuilder
+                | Leq     -> L.build_fcmp L.Fcmp.Ole e1 e2 "flt_leq" llbuilder
+                | Greater -> L.build_fcmp L.Fcmp.Ogt e1 e2 "flt_greater" llbuilder
+                | Geq     -> L.build_fcmp L.Fcmp.Oge e1 e2 "flt_geq" llbuilder
+        in
 
   (* Declare printf(), which the print built-in function will call *)
   let printf_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let printf_func = L.declare_function "printf" printf_t the_module in
 
-  (* Declare the built-in printbig() function *)
-  let printbig_t = L.function_type i32_t [| i32_t |] in
-  let printbig_func = L.declare_function "printbig" printbig_t the_module in
+  (* Declare the built-in printbig() function, probably will be removed *)
+  (*let printbig_t = L.function_type i32_t [| i32_t |] in
+  let printbig_func = L.declare_function "printbig" printbig_t the_module in*)
 
   (* Define each function (arguments and return type) so we can call it *)
   let function_decls =
@@ -86,41 +117,45 @@ let translate (globals, functions) =
 
     (* Construct code for an expression; return its value *)
     let rec expr builder = function
-	A.Literal i -> L.const_int i32_t i
+	  A.Literal i -> L.const_int i32_t i
       | A.BoolLit b -> L.const_int i1_t (if b then 1 else 0)
       | A.Noexpr -> L.const_int i32_t 0
       | A.Id s -> L.build_load (lookup s) s builder
       | A.Binop (e1, op, e2) ->
-	  let e1' = expr builder e1
-	  and e2' = expr builder e2 in
-	  (match op with
-	    A.Add     -> L.build_add
-	  | A.Sub     -> L.build_sub
-	  | A.Mult    -> L.build_mul
+	       let e1' = expr builder e1
+	       and e2' = expr builder e2 in
+    	  (match op with
+    	    A.Add     -> L.build_add
+    	  | A.Sub     -> L.build_sub
+    	  | A.Mult    -> L.build_mul
           | A.Div     -> L.build_sdiv
-	  | A.And     -> L.build_and
-	  | A.Or      -> L.build_or
-	  | A.Equal   -> L.build_icmp L.Icmp.Eq
-	  | A.Neq     -> L.build_icmp L.Icmp.Ne
-	  | A.Less    -> L.build_icmp L.Icmp.Slt
-	  | A.Leq     -> L.build_icmp L.Icmp.Sle
-	  | A.Greater -> L.build_icmp L.Icmp.Sgt
-	  | A.Geq     -> L.build_icmp L.Icmp.Sge
-	  ) e1' e2' "tmp" builder
+          | A.Mod     -> L.build_srem
+    	  | A.And     -> L.build_and
+    	  | A.Or      -> L.build_or
+    	  | A.Veq     -> L.build_icmp L.Icmp.Eq
+          (*| A.Req     -> *)
+    	  | A.Vneq    -> L.build_icmp L.Icmp.Ne
+          (*| A.Rneq    ->*)
+    	  | A.Less    -> L.build_icmp L.Icmp.Slt
+    	  | A.Leq     -> L.build_icmp L.Icmp.Sle
+    	  | A.Greater -> L.build_icmp L.Icmp.Sgt
+    	  | A.Geq     -> L.build_icmp L.Icmp.Sge
+    	  ) e1' e2' "tmp" builder
       | A.Unop(op, e) ->
-	  let e' = expr builder e in
-	  (match op with
-	    A.Neg     -> L.build_neg
-          | A.Not     -> L.build_not) e' "tmp" builder
+	       let e' = expr builder e in
+    	   (match op with
+     	      A.Neg     -> L.build_neg
+            | A.Not     -> L.build_not) e' "tmp" builder
       | A.Assign (s, e) -> let e' = expr builder e in
 	                   ignore (L.build_store e' (lookup s) builder); e'
+      (* Probably will not need
       | A.Call ("print", [e]) | A.Call ("printb", [e]) ->
-	  L.build_call printf_func [| int_format_str ; (expr builder e) |]
-	    "printf" builder
+	       L.build_call printf_func [| int_format_str ; (expr builder e) |]
+	       "printf" builder
       | A.Call ("printbig", [e]) ->
-	  L.build_call printbig_func [| (expr builder e) |] "printbig" builder
+	       L.build_call printbig_func [| (expr builder e) |] "printbig" builder*)
       | A.Call (f, act) ->
-         let (fdef, fdecl) = StringMap.find f function_decls in
+        let (fdef, fdecl) = StringMap.find f function_decls in
 	 let actuals = List.rev (List.map (expr builder) (List.rev act)) in
 	 let result = (match fdecl.A.typ with A.Void -> ""
                                             | _ -> f ^ "_result") in
@@ -137,11 +172,11 @@ let translate (globals, functions) =
     (* Build the code for the given statement; return the builder for
        the statement's successor *)
     let rec stmt builder = function
-	A.Block sl -> List.fold_left stmt builder sl
+	    A.Block sl -> List.fold_left stmt builder sl
       | A.Expr e -> ignore (expr builder e); builder
       | A.Return e -> ignore (match fdecl.A.typ with
-	  A.Void -> L.build_ret_void builder
-	| _ -> L.build_ret (expr builder e) builder); builder
+	       A.Void -> L.build_ret_void builder
+	        | _ -> L.build_ret (expr builder e) builder); builder
       | A.If (predicate, then_stmt, else_stmt) ->
          let bool_val = expr builder predicate in
 	 let merge_bb = L.append_block context "merge" the_function in
