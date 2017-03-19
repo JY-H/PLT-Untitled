@@ -122,10 +122,10 @@ primitive:
 	| FLOAT		{ Float }
 
 list_typ:
-	typ LBRACK RBRACK	{ Lst($1) }
+	LBRACK typ RBRACK	{ Lst($2) }
 
 tuple_typ:
-	typ LPAREN RPAREN	{ Tuple($1) }
+	LPAREN typ RPAREN	{ Tuple($2) }
 
 obj_typ:
 	CLASSID				{ Obj($1) }
@@ -208,11 +208,12 @@ expr:
 	| TILDE expr		{ Unop(Remove, $2) }
 	| LT typ GT expr	{ Cast($2, $4) }
 	| expr ASSIGN expr	{ Assign($1, $3) }
-	| expr DOT ID	{ FieldAccess($1, $3) }
-	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
 	| LPAREN expr RPAREN	{ $2 }
 	| sequence	{ $1 }
 	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
+	| expr DOT ID	{ FieldAccess($1, $3) }
+	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
+	| obj_typ LPAREN actuals_opt RPAREN	{ ObjCreate($1, $3) }
 
 lits:
 	  INTLIT			{ IntLit($1) }

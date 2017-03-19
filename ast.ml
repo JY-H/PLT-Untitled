@@ -28,10 +28,11 @@ type expr =
 	| Assign of expr * expr
 	| Cast of typ * expr
 	| FieldAccess of expr * string
-	| MethodCall of expr * string * expr list
 	| LstCreate of expr list
 	| TupleCreate of expr list
 	| SeqAccess of expr * expr * expr
+	| MethodCall of expr * string * expr list
+	| ObjCreate of typ * expr list
 	| Noexpr
 
 type stmt =
@@ -127,9 +128,6 @@ let rec string_of_expr = function
 	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
 	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
 	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ field
-	| MethodCall(obj, f,  el) ->
-	     string_of_expr obj ^ "." ^ f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
-	| Noexpr -> ""
 	| LstCreate(elems) -> "[" ^ String.concat ", " (List.map string_of_expr
 		elems) ^ "]"
 	| TupleCreate(elems) -> "(" ^ String.concat ", " (List.map string_of_expr
@@ -139,6 +137,11 @@ let rec string_of_expr = function
 		  Noexpr -> ""
 		| _ -> ": " ^ string_of_expr end_index)
 		^ "]"
+	| MethodCall(obj, f, el) ->
+	     string_of_expr obj ^ "." ^ f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
+	| ObjCreate(obj, args) ->
+		string_of_typ obj ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+	| Noexpr -> ""
 
 let rec string_of_stmt = function
 	  Block(stmts) ->
