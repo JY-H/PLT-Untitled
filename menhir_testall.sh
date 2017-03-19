@@ -8,14 +8,22 @@ comparefile=${DECAF_PATH}/tests/menhir/menhir.compare
 outfile=${DECAF_PATH}/tests/menhir/menhir.output
 
 menhir --interpret --interpret-show-cst ${parser} < ${testfile} 2> /dev/null | grep "ACCEPT\|REJECT" > ${outfile};
-compare=$(diff ${comparefile} ${outfile} | grep -o '^[1-9]');
+compare=$(diff <(nl ${comparefile}) <(nl ${outfile}) | grep -o '^[0-9]\+\(,[0-9]\+\)\?');
 
 if [[ "${compare}" != "" ]]; then
-	echo "Failed:";
-	while not_done='\n' read -ra linenos; do
-		for lineno in "${linenos[@]}"; do
-			echo -n "Test #${lineno}: ";
-			sed ${lineno}'!d' ${testfile};
+	while not_done='\n' read -ra linerange; do
+		for range in "${linerange[@]}"; do
+			if [[ "${range}" =~ "," ]]; then
+				IFS=',' read strt end <<< "${range}";
+					for i in $(seq ${strt} ${end}); do
+						echo -n "Test #${i}: ";
+						sed ${i}'!d' ${testfile};
+						echo
+					done
+			else
+				echo -n "Test #${range}: ";
+				sed ${range}'!d' ${testfile};
+			fi
 		done
 	done <<< "${compare}"
 else
