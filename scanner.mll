@@ -63,6 +63,7 @@ rule token = parse
 	| "in"		{ IN }
 	| ":"		{ SNGCOLON }
 	| "::"		{ DBLCOLON }
+	| "throw"	{ THROW }
 	| "try"		{ TRY }
 	| "catch"	{ CATCH }
 	| "finally"	{ FINALLY }

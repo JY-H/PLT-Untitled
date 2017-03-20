@@ -52,6 +52,7 @@ type stmt =
 	| LocalConst of typ * string * expr
 	| TryCatch of stmt * stmt list * stmt
 	| Catch of typ * expr * stmt
+	| Throw of expr
 
 type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
@@ -187,6 +188,7 @@ let rec string_of_stmt = function
 		"\nfinally " ^ string_of_stmt finally_block
 	| Catch(t, id, block) -> "catch (" ^ string_of_typ t ^ " " ^
 		string_of_expr id ^ " " ^ string_of_stmt block
+	| Throw(e) -> "throw " ^ string_of_expr e
 
 let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name
