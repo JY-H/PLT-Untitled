@@ -50,6 +50,8 @@ type stmt =
 	| Continue
 	| LocalVar of typ * string * expr
 	| LocalConst of typ * string * expr
+	| TryCatch of stmt * stmt list * stmt
+	| Catch of typ * expr * stmt
 
 type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
@@ -160,24 +162,24 @@ let rec string_of_stmt = function
 	| Elseif(e, s) -> "elseif (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s
 		^ "\n}\n"
 	| Elseifs(if_expr, if_stmt, elseifs, else_stmt) ->
-		"if (" ^ string_of_expr if_expr ^ ") {\n" ^ string_of_stmt if_stmt ^
-		"\n}\n" ^ String.concat "\n" (List.map string_of_elseif elseifs) ^
-		"else {\n" ^ string_of_stmt else_stmt ^ "\n}\n"
-	| For(e1, e2, e3, s) ->
+		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_stmt ^
+		String.concat "\n" (List.map string_of_stmt elseifs) ^
+		"else " ^ string_of_stmt else_stmt ^ "\n"
+	| For(e1, e2, e3, block) ->
 	    "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
-		string_of_expr e3  ^ ") {\n" ^ string_of_stmt s ^ "\n}\n"
-	| While(e, s) -> "while (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s ^
-		"\n}\n"
-	| Break -> ""
-	| Continue -> ""
+		string_of_expr e3  ^ ") " ^ string_of_stmt block ^ "\n"
+	| While(e, block) -> "while (" ^ string_of_expr e ^ ")" ^ string_of_stmt block
+	| Break -> "break;"
+	| Continue -> "continue;"
 	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
 	| LocalConst(t, id, e) -> "const" ^ string_of_typ t ^ " " ^ id ^ " " ^
         string_of_expr e ^ ";\n"
-
-and string_of_elseif = function
-	  Elseif(expr, stmt) -> "elseif (" ^ string_of_expr expr ^ ") {\n" ^
-		string_of_stmt stmt ^ "\n}\n"
-	| _ -> ""
+	| TryCatch(try_block, catch_list, finally_block) ->
+		"try " ^ string_of_stmt try_block ^
+		String.concat "\n" (List.map string_of_stmt catch_list) ^
+		"\nfinally " ^ string_of_stmt finally_block
+	| Catch(t, id, block) -> "catch (" ^ string_of_typ t ^ " " ^
+		string_of_expr id ^ " " ^ string_of_stmt block ^ "\n"
 
 let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name

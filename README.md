@@ -1,6 +1,5 @@
 ## DECAF - General Purpose Object Oriented Language
 ### TODO
-* Finish testing AST generation using MENHIR.
 * Compile a list of necessary additions to the semantic checker.
 * Start on code generation.
 
