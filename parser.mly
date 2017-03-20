@@ -5,9 +5,9 @@
 %token SEMI LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COMMA
 %token PLUS MINUS TIMES DIVIDE MOD ASSIGN
 %token REQ VEQ RNEQ VNEQ LT LEQ GT GEQ TRUE FALSE AND OR NOT
-%token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE
+%token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE TRY CATCH FINALLY
 %token INT BOOL VOID STRING CHAR FLOAT NULL
-%token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON TRY CATCH FINALLY
+%token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON
 %token CLASS SELF SUPER EXTENDS IMPLEMENTS CONST
 %token <int> INTLIT
 %token <float> FLTLIT
@@ -39,16 +39,18 @@
 %%
 
 program:
-	cdecls EOF	{ Program($1) }
+	global_decls EOF	{ Program($1) }
 
-cdecls:
-	/* TODO: allow empty program? */
-	  /* nothing */	{ [] } 
-	| cdecl_list	{ List.rev $1 }
-
-cdecl_list:
-	cdecl	{ [$1] }
-	| cdecl_list cdecl	{ $2::$1 }
+global_decls:
+	  /* nothing */ { {
+		cdecls = [];
+		fdecls = []	} }
+	| global_decls cdecl	{ { 
+		cdecls = $2 :: $1.cdecls;
+		fdecls = $1.fdecls	} }
+	| global_decls fdecl	{ {
+		cdecls = $1.cdecls;
+		fdecls = $2 :: $1.fdecls } }
 
 cdecl:
 	  CLASS CLASSID LBRACE cbody RBRACE	{ {
@@ -66,15 +68,15 @@ cdecl:
 		cbody = $6;
 		sclass = None;
 		interfaces = $4 } }
-	| CLASS CLASSID EXTENDS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody RBRACE
-	{ {
+	| CLASS CLASSID EXTENDS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody
+	  RBRACE { {
 		cname = $2;
 		cbody = $8;
 		sclass = Some $4;
 		interfaces = $6 } }
 
 cbody:
-	/* nothing */	{ {
+	  /* nothing */	{ {
 		fields = [];
 		methods = []; } }
 	| cbody vdecl	{ {
