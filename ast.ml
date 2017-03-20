@@ -32,6 +32,7 @@ type expr =
 	| TupleCreate of expr list
 	| SeqAccess of expr * expr * expr
 	| MethodCall of expr * string * expr list
+	| FuncCall of string * expr list
 	| ObjCreate of typ * expr list
 	| Self
 	| Super of expr list
@@ -147,9 +148,11 @@ let rec string_of_expr = function
 		"[" ^ string_of_expr start_index ^ (match end_index with
 		  Noexpr -> ""
 		| _ -> ": " ^ string_of_expr end_index) ^ "]"
-	| MethodCall(obj, f, el) ->
-		string_of_expr obj ^ "." ^ f ^
-		"(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
+	| MethodCall(obj, fname, args) ->
+		string_of_expr obj ^ "." ^ fname ^
+		"(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+	| FuncCall(fname, args) ->
+		fname ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
 	| ObjCreate(obj, args) ->
 		string_of_typ obj ^
 		"(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
