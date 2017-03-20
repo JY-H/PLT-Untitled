@@ -2,13 +2,12 @@
 
 %{ open Ast %}
 
-/* TODO: renaming? */
 %token SEMI LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COMMA
 %token PLUS MINUS TIMES DIVIDE MOD ASSIGN
 %token REQ VEQ RNEQ VNEQ LT LEQ GT GEQ TRUE FALSE AND OR NOT
-%token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE
+%token RETURN IF ELSE ELSEIF BREAK CONTINUE FOR WHILE TRY CATCH FINALLY
 %token INT BOOL VOID STRING CHAR FLOAT NULL
-%token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON TRY CATCH FINALLY
+%token ARROW AMP TILDE DOT IN SNGCOLON DBLCOLON
 %token CLASS SELF SUPER EXTENDS IMPLEMENTS CONST
 %token <int> INTLIT
 %token <float> FLTLIT
@@ -17,7 +16,7 @@
 %token <string> ID CLASSID
 %token EOF
 
-%nonassoc NOELSE NOELSEIF NOOBJECT
+%nonassoc NOELSE NOELSEIF NOFINALLY
 %nonassoc ELSEIF
 %nonassoc ELSE
 %right ASSIGN
@@ -40,46 +39,44 @@
 %%
 
 program:
-	cdecls EOF { Program($1) }
+	global_decls EOF	{ Program($1) }
 
-cdecls:
-	/* TODO: allow empty program? */
-	  /* nothing */ { [] } 
-        |  cdecl_list	{ List.rev $1 }
-
-cdecl_list:
-	cdecl	{ [$1] }
-	| cdecl_list cdecl	{ $2::$1 }
+global_decls:
+	  /* nothing */ { {
+		cdecls = [];
+		fdecls = []	} }
+	| global_decls cdecl	{ { 
+		cdecls = $2 :: $1.cdecls;
+		fdecls = $1.fdecls	} }
+	| global_decls fdecl	{ {
+		cdecls = $1.cdecls;
+		fdecls = $2 :: $1.fdecls } }
 
 cdecl:
-        /* TODO: It may be worth separating out the classes that have
-         * extensions/interfaces from those that don't. I'm a little wary of
-         * about what I wrote here...
-         */
-	CLASS CLASSID LBRACE cbody RBRACE	{ {
-                cname = $2;
-				cbody = $4;
-                sclass = None;
-                interfaces = None } }
+	  CLASS CLASSID LBRACE cbody RBRACE	{ {
+		cname = $2;
+		cbody = $4;
+		sclass = None;
+		interfaces = None } }
 	| CLASS CLASSID EXTENDS CLASSID LBRACE cbody RBRACE	{ {
-                cname = $2;
-                cbody = $6;
-                sclass = Some $4;
-                interfaces = None } }
+		cname = $2;
+		cbody = $6;
+		sclass = Some $4;
+		interfaces = None } }
 	| CLASS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody RBRACE	{ {
-                cname = $2;
-                cbody = $6;
-                sclass = None;
-                interfaces = $4 } }
-	| CLASS CLASSID EXTENDS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody RBRACE
-	{ {
-                cname = $2;
-                cbody = $8;
-                sclass = Some $4;
-                interfaces = $6 } }
+		cname = $2;
+		cbody = $6;
+		sclass = None;
+		interfaces = $4 } }
+	| CLASS CLASSID EXTENDS CLASSID IMPLEMENTS classid_list_opt LBRACE cbody
+	  RBRACE { {
+		cname = $2;
+		cbody = $8;
+		sclass = Some $4;
+		interfaces = $6 } }
 
 cbody:
-	/* nothing */	{ {
+	  /* nothing */	{ {
 		fields = [];
 		methods = []; } }
 	| cbody vdecl	{ {
@@ -98,8 +95,8 @@ fdecl:
 		body = List.rev $8 } }
 
 formals_opt:
-	  /* nothing */ { [] }
-	| formal_list   { List.rev $1 }
+	  /* nothing */	{ [] }
+	| formal_list	{ List.rev $1 }
 
 formal_list:
 	  typ ID					{ [Formal($1, $2)] }
@@ -133,7 +130,7 @@ obj_typ:
 
 classid_list_opt:
 	/* nothing */ { Some [] }
-	| classid_list     { Some (List.rev $1) }
+	| classid_list		{ Some (List.rev $1) }
 
 classid_list:
 	  CLASSID					{ [$1] } 
@@ -149,7 +146,7 @@ stmt:
 	| RETURN expr SEMI { Return $2 }
 	/* if */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSE
-		{ If($3, Block($6), Block([])) }
+		{ If($3, Block(List.rev $6), Block([])) }
 	/* if-elseif */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
@@ -159,31 +156,40 @@ stmt:
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  ELSE LBRACE stmt_list RBRACE
-		{ Elseifs($3, Block(List.rev $6), List.rev $8,
-		Block(List.rev $11)) }
+		{ Elseifs($3, Block(List.rev $6), List.rev $8, Block(List.rev $11)) }
 	/* if-else*/
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE LBRACE stmt_list RBRACE
 		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
-	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE { While($3,
-		Block(List.rev $6)) }
+	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE
+		{ While($3, Block(List.rev $6)) }
 	| BREAK	SEMI { Break }
 	| CONTINUE SEMI { Continue }
+	| TRY LBRACE stmt_list RBRACE catch_list %prec NOFINALLY
+		{ TryCatch(Block(List.rev $3), $5, Block([])) }
+	| TRY LBRACE stmt_list RBRACE catch_list FINALLY LBRACE stmt_list RBRACE
+		{ TryCatch(Block(List.rev $3), $5, Block(List.rev $8)) }
 	| typ ID SEMI	{ LocalVar($1, $2, Noexpr) }
 	| typ ID ASSIGN expr SEMI	{ LocalVar($1, $2, $4) }
 	| CONST primitive ID SEMI	{ LocalConst($2, $3, Noexpr) }
 	| CONST primitive ID ASSIGN expr SEMI	{ LocalConst($2, $3, $5) }
 
+catch_list:
+	  CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE
+		{ [Catch(Obj($3), Id($4), Block(List.rev $7))] }
+	| CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE catch_list
+		{ Catch(Obj($3), Id($4), Block(List.rev $7)) :: $9}
+
 elseifs:
-	ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSEIF
-		{ Elseif($3, Block(List. rev $6)) :: [] }
+	  ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSEIF
+		{ [Elseif($3, Block(List.rev $6))] }
 	| ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE elseifs
 		{ Elseif($3, Block(List.rev $6)) :: $8 }
 
 expr_opt:
-	/* nothing */ { Noexpr }
-	| expr          { $1 }
+	  /* nothing */	{ Noexpr }
+	| expr			{ $1 }
 
 expr:
 	  lits				{ $1 }
@@ -234,9 +240,9 @@ sequence:
 	| LBRACK list_elems		{ LstCreate(List.rev $2) }
 
 tuple_elems:
-	  RPAREN	{ [] }
-	| expr RPAREN { [$1] }
-	| expr COMMA tuple_elems { $1 :: $3 }
+	  RPAREN					{ [] }
+	| expr RPAREN				{ [$1] }
+	| expr COMMA tuple_elems	{ $1 :: $3 }
 
 list_elems:
 	  expr RBRACK	{ [$1] }
@@ -254,9 +260,9 @@ vdecl:
 	| CONST primitive ID ASSIGN expr SEMI	{ ObjConst($2, $3, $5) }
 
 actuals_opt:
-	  /* nothing */ { [] }
-	| actuals_list  { List.rev $1 }
+	  /* nothing */	{ [] }
+	| actuals_list	{ List.rev $1 }
 
 actuals_list:
-	  expr                    { [$1] }
-	| actuals_list COMMA expr { $3 :: $1 }
+	  expr						{ [$1] }
+	| actuals_list COMMA expr	{ $3 :: $1 }
