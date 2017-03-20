@@ -178,9 +178,9 @@ stmt:
 
 catch_list:
 	  CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE
-		{ [Catch(Obj($3), Id($4), Block(List.rev $7))] }
+		{ [Catch(Obj($3), $4, Block(List.rev $7))] }
 	| CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE catch_list
-		{ Catch(Obj($3), Id($4), Block(List.rev $7)) :: $9}
+		{ Catch(Obj($3), $4, Block(List.rev $7)) :: $9}
 
 elseifs:
 	  ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSEIF

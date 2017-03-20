@@ -13,7 +13,7 @@ type typ = Int | Float | Bool | Char | String | Void |
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
 
-type id_list = string list
+type classid_list = string list
 
 type expr =
 	  IntLit of int
@@ -51,7 +51,7 @@ type stmt =
 	| LocalVar of typ * string * expr
 	| LocalConst of typ * string * expr
 	| TryCatch of stmt * stmt list * stmt
-	| Catch of typ * expr * stmt
+	| Catch of typ * string * stmt
 	| Throw of expr
 
 type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
@@ -73,7 +73,7 @@ type class_decl = {
 	cname: string;
 	cbody: class_body;
 	sclass: string option;
-	interfaces: id_list option;
+	interfaces: classid_list option;
 }
 
 type global_decls = {
@@ -97,29 +97,29 @@ let rec string_of_typ = function
 	| Obj(id) -> id
 
 let string_of_op = function
-    Add -> "+"
-  | Sub -> "-"
-  | Mult -> "*"
-  | Div -> "/"
-  | Mod -> "%"
-  | Req -> "=="
-  | Veq -> "==="
-  | Rneq -> "!="
-  | Vneq -> "!=="
-  | Less -> "<"
-  | Leq -> "<="
-  | Greater -> ">"
-  | Geq -> ">="
-  | And -> "and"
-  | Or -> "or"
-  | In -> "in"
-  | Append -> "::"
-  | Concat -> "@"
+	  Add -> "+"
+	| Sub -> "-"
+	| Mult -> "*"
+	| Div -> "/"
+	| Mod -> "%"
+	| Req -> "=="
+	| Veq -> "==="
+	| Rneq -> "!="
+	| Vneq -> "!=="
+	| Less -> "<"
+	| Leq -> "<="
+	| Greater -> ">"
+	| Geq -> ">="
+	| And -> "and"
+	| Or -> "or"
+	| In -> "in"
+	| Append -> "::"
+	| Concat -> "@"
 
 let string_of_uop = function
-    Neg -> "-"
-  | Not -> "not"
-  | Remove -> "~"
+	  Neg -> "-"
+	| Not -> "not"
+	| Remove -> "~"
 
 let string_of_vdecl(t, id) = string_of_typ t ^ " " ^ id ^ ";\n"
 
@@ -133,26 +133,29 @@ let rec string_of_expr = function
 	| Id(s) -> s
 	| Null -> "null"
 	| Binop(e1, o, e2) ->
-	    string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+		string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
 	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
 	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
 	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
 	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ field
-	| LstCreate(elems) -> "[" ^ String.concat ", " (List.map string_of_expr
-		elems) ^ "]"
-	| TupleCreate(elems) -> "(" ^ String.concat ", " (List.map string_of_expr
-	  	elems) ^ ")"
-	| SeqAccess(sequence, start_index, end_index) -> string_of_expr sequence ^
+	| LstCreate(elems) ->
+		"[" ^ String.concat ", " (List.map string_of_expr elems) ^ "]"
+	| TupleCreate(elems) ->
+		"(" ^ String.concat ", " (List.map string_of_expr elems) ^ ")"
+	| SeqAccess(sequence, start_index, end_index) ->
+		string_of_expr sequence ^
 		"[" ^ string_of_expr start_index ^ (match end_index with
 		  Noexpr -> ""
-		| _ -> ": " ^ string_of_expr end_index)
-		^ "]"
+		| _ -> ": " ^ string_of_expr end_index) ^ "]"
 	| MethodCall(obj, f, el) ->
-	     string_of_expr obj ^ "." ^ f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
+		string_of_expr obj ^ "." ^ f ^
+		"(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
 	| ObjCreate(obj, args) ->
-		string_of_typ obj ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+		string_of_typ obj ^
+		"(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
 	| Self -> "self"
-	| Super(args) -> "super(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
+	| Super(args) ->
+		"super(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
 	| Noexpr -> ""
 
 let rec string_of_stmt = function
@@ -172,32 +175,32 @@ let rec string_of_stmt = function
 		String.concat "\n" (List.map string_of_stmt elseifs) ^
 		"else " ^ string_of_stmt else_block
 	| For(e1, e2, e3, block) ->
-	    "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
+		"for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
 		string_of_expr e3  ^ ") " ^ string_of_stmt block ^ "\n"
-	| While(e, block) -> "while (" ^ string_of_expr e ^ ")" ^
-		string_of_stmt block
+	| While(e, block) ->
+		"while (" ^ string_of_expr e ^ ")" ^ string_of_stmt block
 	| Break -> "break;\n"
 	| Continue -> "continue;\n"
-	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^
-		string_of_expr e ^ ";\n"
-	| LocalConst(t, id, e) -> "const" ^ string_of_typ t ^ " " ^ id ^ " " ^
-        string_of_expr e ^ ";\n"
+	| LocalVar(t, id, e) ->
+		string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
+	| LocalConst(t, id, e) ->
+		"const" ^ string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
 	| TryCatch(try_block, catch_list, finally_block) ->
 		"try " ^ string_of_stmt try_block ^
 		String.concat "\n" (List.map string_of_stmt catch_list) ^
 		"\nfinally " ^ string_of_stmt finally_block
-	| Catch(t, id, block) -> "catch (" ^ string_of_typ t ^ " " ^
-		string_of_expr id ^ " " ^ string_of_stmt block
+	| Catch(t, id, block) ->
+		"catch (" ^ string_of_typ t ^ " " ^ id ^ ") " ^ string_of_stmt block
 	| Throw(e) -> "throw " ^ string_of_expr e
 
 let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name
 
 let string_of_field = function
-	   ObjVar(t, name, e) ->
-		string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
-	 | ObjConst(t, name, e) ->
-		"const" ^ string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
+	  ObjVar(t, id, e) ->
+		string_of_typ t ^ " " ^ id ^ " = " ^ string_of_expr e ^ ";\n"
+	| ObjConst(t, id, e) ->
+		"const" ^ string_of_typ t ^ " " ^ id ^ " = " ^ string_of_expr e ^ ";\n"
 
 let string_of_func_decl func_decl =
 	func_decl.fname ^ "(" ^
