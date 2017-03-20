@@ -56,11 +56,11 @@ type stmt =
 type field = ObjVar of typ * string * expr | ObjConst of typ * string * expr
 
 type func_decl = {
-    return_typ: typ;
-    fname: string;
-    formals: formal_param list;
-    (* locals: local list; *)
-    body: stmt list;
+	return_typ: typ;
+	fname: string;
+	formals: formal_param list;
+	(* locals: local list; *)
+	body: stmt list;
 }
 
 type class_body = {
@@ -71,11 +71,16 @@ type class_body = {
 type class_decl = {
 	cname: string;
 	cbody: class_body;
-        sclass: string option;
-        interfaces: id_list option;
+	sclass: string option;
+	interfaces: id_list option;
 }
 
-type program = Program of class_decl list
+type global_decls = {
+	cdecls: class_decl list;
+	fdecls: func_decl list;
+}
+
+type program = Program of global_decls
 
 (* Pretty-printing functions *)
 
@@ -154,24 +159,26 @@ let rec string_of_stmt = function
 		"{\n" ^ String.concat "" (List.map string_of_stmt stmts) ^ "}\n"
 	| Expr(expr) -> string_of_expr expr ^ ";\n"
 	| Return(expr) -> "return " ^ string_of_expr expr ^ ";\n"
-	| If(e, s, Block([])) -> "if (" ^ string_of_expr e ^ ")\n" ^
-		string_of_stmt s
-	| If(e, s1, s2) -> "if (" ^ string_of_expr e ^ ") {\n" ^
-		string_of_stmt s1 ^ "\n}\nelse {\n" ^ string_of_stmt s2 ^
-                "\n}\n"
-	| Elseif(e, s) -> "elseif (" ^ string_of_expr e ^ ") {\n" ^ string_of_stmt s
-		^ "\n}\n"
-	| Elseifs(if_expr, if_stmt, elseifs, else_stmt) ->
-		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_stmt ^
+	| If(if_expr, if_block , Block([])) ->
+		"if (" ^ string_of_expr if_expr ^ ")\n" ^ string_of_stmt if_block
+	| If(if_expr, if_block, else_block) ->
+		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_block ^
+		"else " ^ string_of_stmt else_block
+	| Elseif(e, block) ->
+		"elseif (" ^ string_of_expr e ^ ") " ^ string_of_stmt block
+	| Elseifs(if_expr, if_block, elseifs, else_block) ->
+		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_block ^
 		String.concat "\n" (List.map string_of_stmt elseifs) ^
-		"else " ^ string_of_stmt else_stmt ^ "\n"
+		"else " ^ string_of_stmt else_block
 	| For(e1, e2, e3, block) ->
 	    "for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
 		string_of_expr e3  ^ ") " ^ string_of_stmt block ^ "\n"
-	| While(e, block) -> "while (" ^ string_of_expr e ^ ")" ^ string_of_stmt block
-	| Break -> "break;"
-	| Continue -> "continue;"
-	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^ string_of_expr e ^ ";\n"
+	| While(e, block) -> "while (" ^ string_of_expr e ^ ")" ^
+		string_of_stmt block
+	| Break -> "break;\n"
+	| Continue -> "continue;\n"
+	| LocalVar(t, id, e) -> string_of_typ t ^ " " ^ id ^ " " ^
+		string_of_expr e ^ ";\n"
 	| LocalConst(t, id, e) -> "const" ^ string_of_typ t ^ " " ^ id ^ " " ^
         string_of_expr e ^ ";\n"
 	| TryCatch(try_block, catch_list, finally_block) ->
@@ -179,26 +186,32 @@ let rec string_of_stmt = function
 		String.concat "\n" (List.map string_of_stmt catch_list) ^
 		"\nfinally " ^ string_of_stmt finally_block
 	| Catch(t, id, block) -> "catch (" ^ string_of_typ t ^ " " ^
-		string_of_expr id ^ " " ^ string_of_stmt block ^ "\n"
+		string_of_expr id ^ " " ^ string_of_stmt block
 
 let string_of_formal = function
 	  Formal(t, name) -> string_of_typ t ^ " " ^ name
 
 let string_of_field = function
-	   ObjVar(t, name, e) -> string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
-	 | ObjConst(t, name, e) -> "const" ^ string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
+	   ObjVar(t, name, e) ->
+		string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
+	 | ObjConst(t, name, e) ->
+		"const" ^ string_of_typ t ^ " " ^ name ^ " = " ^ string_of_expr e ^ ";\n"
 
-let string_of_fdecl func_decl =
+let string_of_func_decl func_decl =
 	func_decl.fname ^ "(" ^
 	String.concat ", " (List.map string_of_formal func_decl.formals) ^
 	") ->" ^ string_of_typ func_decl.return_typ ^ " {\n" ^
 	String.concat "" (List.map string_of_stmt func_decl.body) ^ "}\n"
 
-let string_of_class class_decl =
+let string_of_class_decl class_decl =
 	"class " ^ class_decl.cname ^ " {\n" ^
 	String.concat "" (List.map string_of_field class_decl.cbody.fields) ^ "\n" ^
-	String.concat "\n" (List.map string_of_fdecl class_decl.cbody.methods) ^
+	String.concat "\n" (List.map string_of_func_decl class_decl.cbody.methods) ^
 	"\n}\n"
 
+let string_of_global_decls gdecls = 
+	String.concat "\n" (List.map string_of_class_decl gdecls.cdecls) ^
+	String.concat "\n" (List.map string_of_func_decl gdecls.fdecls)
+
 let string_of_program program = match program with
-	Program cdecls -> String.concat "" (List.map string_of_class cdecls)
+	Program gdecls -> string_of_global_decls gdecls
