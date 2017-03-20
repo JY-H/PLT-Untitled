@@ -16,9 +16,7 @@
 %token <string> ID CLASSID
 %token EOF
 
-%nonassoc NOELSE NOELSEIF NOFINALLY
-%nonassoc ELSEIF
-%nonassoc ELSE
+%nonassoc NOELSE NOFINALLY
 %right ASSIGN
 %left OR
 %left AND
@@ -29,7 +27,6 @@
 %left PLUS MINUS MOD
 %left TIMES DIVIDE
 %right NOT NEG
-%left LPAREN
 %left LBRACK
 %right DOT
 
@@ -53,6 +50,7 @@ global_decls:
 		fdecls = $2 :: $1.fdecls } }
 
 cdecl:
+	/* TODO: possibly don't do interfaces because they'll be difficult */
 	  CLASS CLASSID LBRACE cbody RBRACE	{ {
 		cname = $2;
 		cbody = $4;
@@ -146,20 +144,20 @@ stmt:
 	| RETURN expr SEMI { Return $2 }
 	/* if */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSE
-		{ If($3, Block(List.rev $6), Block([])) }
+		{ If($3, Block(List.rev $6), [], Block([])) }
+	/* if-else*/
+	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE LBRACE stmt_list RBRACE
+		{ If($3, Block(List.rev $6), [],  Block(List.rev $10)) }
 	/* if-elseif */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  %prec NOELSE
-		{ Elseifs($3, Block(List.rev $6), List.rev $8, Block([])) }
+		{ If($3, Block(List.rev $6), List.rev $8, Block([])) }
 	/* if-elseif-else */
 	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 	  elseifs
 	  ELSE LBRACE stmt_list RBRACE
-		{ Elseifs($3, Block(List.rev $6), List.rev $8, Block(List.rev $11)) }
-	/* if-else*/
-	| IF LPAREN expr RPAREN LBRACE stmt_list RBRACE ELSE LBRACE stmt_list RBRACE
-		{ If($3, Block(List.rev $6), Block(List.rev $10)) }
+		{ If($3, Block(List.rev $6), List.rev $8, Block(List.rev $11)) }
 	| FOR LPAREN expr_opt SEMI expr SEMI expr_opt RPAREN LBRACE stmt_list RBRACE
 		{ For($3, $5, $7, Block(List.rev $10)) }
 	| WHILE LPAREN expr RPAREN LBRACE stmt_list RBRACE
@@ -183,7 +181,7 @@ catch_list:
 		{ Catch(Obj($3), $4, Block(List.rev $7)) :: $9}
 
 elseifs:
-	  ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE %prec NOELSEIF
+	  ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE
 		{ [Elseif($3, Block(List.rev $6))] }
 	| ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE elseifs
 		{ Elseif($3, Block(List.rev $6)) :: $8 }

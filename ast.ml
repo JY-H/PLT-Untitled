@@ -42,9 +42,8 @@ type stmt =
 	  Block of stmt list
 	| Expr of expr
 	| Return of expr
-	| If of expr * stmt * stmt
+	| If of expr * stmt * stmt list * stmt
 	| Elseif of expr * stmt
-	| Elseifs of expr * stmt * stmt list * stmt
 	| For of expr * expr * expr * stmt
 	| While of expr * stmt
 	| Break
@@ -166,17 +165,24 @@ let rec string_of_stmt = function
 		"{\n" ^ String.concat "" (List.map string_of_stmt stmts) ^ "}\n"
 	| Expr(expr) -> string_of_expr expr ^ ";\n"
 	| Return(expr) -> "return " ^ string_of_expr expr ^ ";\n"
-	| If(if_expr, if_block , Block([])) ->
-		"if (" ^ string_of_expr if_expr ^ ")\n" ^ string_of_stmt if_block
-	| If(if_expr, if_block, else_block) ->
+	(* if *)
+	| If(if_expr, if_block , [], Block([])) ->
+		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_block
+	(* if-else *)
+	| If(if_expr, if_block, [], else_block) ->
 		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_block ^
 		"else " ^ string_of_stmt else_block
-	| Elseif(e, block) ->
-		"elseif (" ^ string_of_expr e ^ ") " ^ string_of_stmt block
-	| Elseifs(if_expr, if_block, elseifs, else_block) ->
+	(* if-elseif *)
+	| If(if_expr, if_block, elseifs, Block([])) ->
+		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_block ^
+		String.concat "\n" (List.map string_of_stmt elseifs)
+	(* if-elseif-else *)
+	| If(if_expr, if_block, elseifs, else_block) ->
 		"if (" ^ string_of_expr if_expr ^ ") " ^ string_of_stmt if_block ^
 		String.concat "\n" (List.map string_of_stmt elseifs) ^
 		"else " ^ string_of_stmt else_block
+	| Elseif(e, block) ->
+		"elseif (" ^ string_of_expr e ^ ") " ^ string_of_stmt block
 	| For(e1, e2, e3, block) ->
 		"for (" ^ string_of_expr e1  ^ " ; " ^ string_of_expr e2 ^ " ; " ^
 		string_of_expr e3  ^ ") " ^ string_of_stmt block ^ "\n"
