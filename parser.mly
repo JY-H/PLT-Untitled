@@ -39,7 +39,7 @@
 %%
 
 program:
-	global_decls EOF	{ $1 }
+	global_decls EOF	{ Program($1) }
 
 global_decls:
 	  /* nothing */ { {

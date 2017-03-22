@@ -39,15 +39,15 @@ let str_t = L.pointer_type i8_t;;
 let void_t = L.void_type context;;
 
 let rec get_llvm_type = function
-	  A.Int -> i32_t
-	| A.Float -> f_t
-	| A.Bool -> i1_t
-	| A.Char -> i8_t
-	| A.Void -> void_t
-	| A.String -> str_t
-	(* Add tuple/list types *)
-	| A.Obj(name) -> L.pointer_type(find_global_class name)
-	| _ -> raise (Failure ("Type not yet supported."))
+      A.Int -> i32_t
+    | A.Float -> f_t
+    | A.Bool -> i1_t
+    | A.Char -> i8_t
+    | A.Void -> void_t
+    | A.String -> str_t
+    (* Add tuple/list types *)
+    | A.Obj(name) -> L.pointer_type(find_global_class name)
+    | _ -> raise (Failure ("Type not yet supported."))
 
 (* Find a global declaration (class/function) if it exists. *)
 and find_global_func name = 

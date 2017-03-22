@@ -30,7 +30,7 @@ let get_class_maps cdecls =
                     StringMap.add name const_field map
         in
 
-        (* Map all functions. *)
+        (* Map all functions within class declarations. *)
         let map_functions map fdecl =
             if (StringMap.mem fdecl.fname map) then
                 raise (Failure(" duplicate function: " ^ fdecl.fname))
@@ -69,13 +69,17 @@ let get_sast class_maps cdecls =
             List.hd main_decls
     (* TODO: Add something to extract functions and replace [] with it. Line
      * 795. *)
-    in get_main []
+    in 
+    {
+        classes = [];
+        functions = [];
+        main = [];
+    }
 
-let check (classes, funcs)  =
-    let class_maps = get_class_maps classes 
-    in
-    let sast = get_sast class_maps funcs
-    in
-    sast
+let check program = match program with
+    Program(globals) ->  
+        let class_maps = get_class_maps globals.cdecls in
+        let sast = get_sast class_maps globals.fdecls in
+        sast
     (* TODO: A lot of shit. But check is the main function so we need to add top
      * level logic here. *)
