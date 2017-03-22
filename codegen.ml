@@ -11,6 +11,7 @@ http://llvm.moe/
 http://llvm.moe/ocaml/
 
 *)
+open Llvm
 
 module L = Llvm
 module A = Ast
