@@ -23,10 +23,12 @@ make
 ### TODO
 ##### `hello_world` Immediate TODOs
   * semant.ml: 
-    * Update to match parser and ast.
     * Add `print` as a built-in function.
   * codegen.ml:
-    * Fill in `func_stub_gen` and `func_body_gen`. 
+    * Add codegen for main function. Support has already been added in semant.ml
+      and sast.ml. Ignore func_gen for now because it's a heap of mess that we
+      need to refactor.
+
 ##### Others
 * Compile a list of necessary additions to the semantic checker.
 

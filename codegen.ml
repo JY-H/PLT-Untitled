@@ -22,7 +22,7 @@ module Hash = Hashtbl
 
 module StringMap = Map.Make(String)
 let global_classes:(string, L.lltype) Hash.t = Hash.create 50
-let global_funcs:(string, L.llvalue) Hash.t = Hash.create 50
+let global_funcs:(string, L.lltype) Hash.t = Hash.create 50
 let global_vars:(string, L.llvalue) Hash.t = Hash.create 50
 let local_params:(string, L.llvalue) Hash.t = Hash.create 50
 let local_values:(string, L.llvalue) Hash.t = Hash.create 50
@@ -65,28 +65,24 @@ let construct_library_functions =
     () (* return unit *)
 
 let init_params func formals =
-	let formal_array = Array.of_list (formals) in
-	Array.iteri (fun index value ->
-		let name = formal_array.(index) in
-		let name = A.string_of_formal name in
-			L.set_value_name name value;
-			Hash.add local_params name value; ) (L.params func)
+    let formal_array = Array.of_list (formals) in
+    Array.iteri (fun index value ->
+        let name = formal_array.(index) in
+        let name = A.string_of_formal name in
+        L.set_value_name name value;
+        Hash.add local_params name value; ) (L.params func)
 
 let func_stub_gen fdecl =
-	let param_types = List.rev (List.fold_left
-	(fun x -> (function A.Formal(t, _) -> get_llvm_type t :: x)) []
-			fdecl.sformals) in
+    let param_types = List.rev (
+        List.fold_left 
+            (fun x -> (function A.Formal(t, _) -> get_llvm_type t :: x))
+            [] fdecl.sformals
+        ) 
+    in
+    let func_type = L.function_type (get_llvm_type fdecl.stype) (Array.of_list param_types) 
+    in
+    Hash.add global_funcs fdecl.sfname func_type
 
-let func_type = L.function_type (get_llvm_type fdecl.stype)
-	(Array.of_list param_types) in
-	L.define_function fdecl.sfname func_type codegen_module
-
-let func_body_gen fdecl =
-	Hash.clear local_values;
-	Hash.clear local_params;
-	let func = find_global_func fdecl.sfname in
-	let llbuilder = L.builder_at_end context (L.entry_block func) in
-	let _ = init_params func fdecl.sformals in ()
 
 let translate sprogram =
     let _ = construct_library_functions
@@ -98,8 +94,6 @@ let translate sprogram =
     in
 
     let _ = List.map (fun f -> func_stub_gen f) sprogram.functions
-    in
-    let _ = List.map (fun f -> func_body_gen f) sprogram.functions
     (*in
     let _ = main_gen sprogram.main sprogram.classes
     *)
