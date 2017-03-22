@@ -21,8 +21,14 @@ make
     ```
 
 ### TODO
+##### `hello_world` Immediate TODOs
+  * semant.ml: 
+    * Update to match parser and ast.
+    * Add `print` as a built-in function.
+  * codegen.ml:
+    * Fill in `func_stub_gen` and `func_body_gen`. 
+##### Others
 * Compile a list of necessary additions to the semantic checker.
-* Start on code generation.
 
 ### Issues
 
