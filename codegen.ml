@@ -15,6 +15,7 @@ open Llvm
 
 module L = Llvm
 module A = Ast
+module Hash = Hashtbl
 (* Add semantic checke *)
 (* module Sem = Semant *)
 
@@ -27,12 +28,12 @@ let builder = L.builder context
 
 let i1_t = L.i1_type context;;
 let i8_t = L.i8_type context;;
-let i32_t = L.i32_type econtext;;
+let i32_t = L.i32_type context;;
 let f_t = L.double_type context;;
 let str_t = L.pointer_type i8_t;;
 let void_t = L.void_type context;;
 
-let get_llvm_type = function
+let rec get_llvm_type = function
       A.Int -> i32_t
     | A.Float -> f_t
     | A.Bool -> i1_t
@@ -63,7 +64,6 @@ let translate sprogram =
     let _ = List.map (fun s -> class_stub_gen s) sprogram.classes
     in
     let _ = List.map (fun s -> class_gen s) sprogram.classes
-    *)
     in
 
     let _ = List.map (fun f -> func_stub_gen f) sprogram.functions
@@ -71,5 +71,6 @@ let translate sprogram =
     let _ = List.map (fun f -> func_body_gen f) sprogram.functions
     in
     let _ = main_gen sprogram.main sprogram.classes
+    *)
     in
     codegen_module
