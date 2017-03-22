@@ -6,7 +6,7 @@
 
 .PHONY : decaf.native
 
-espresso.native :
+decaf.native :
 	ocamlbuild -use-ocamlfind -pkgs llvm,llvm.analysis -cflags -w,+a-4 \
 		decaf.native
 
@@ -23,7 +23,7 @@ clean :
 
 OBJS = ast.cmx codegen.cmx parser.cmx scanner.cmx semant.cmx decaf.cmx
 
-espresso : $(OBJS)
+decaf : $(OBJS)
 	ocamlfind ocamlopt -linkpkg -package llvm -package llvm.analysis $(OBJS) -o decaf
 
 scanner.ml : scanner.mll
@@ -75,6 +75,6 @@ TARFILES = ast.ml codegen.ml Makefile decaf.ml parser.mly README scanner.mll \
 	semant.ml testall.sh $(TESTFILES:%=tests/%)
 
 decaf-llvm.tar.gz : $(TARFILES)
-	cd .. && tar czf decaf-llvm/espresso-llvm.tar.gz \
+	cd .. && tar czf decaf-llvm/decaf-llvm.tar.gz \
 		$(TARFILES:%=decaf-llvm/%)
 
