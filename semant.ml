@@ -71,11 +71,10 @@ let get_sast class_maps cdecls =
      * 795. *)
     in get_main []
 
-let check prog = match prog with
-	Program(global_decls) -> 
-    let class_maps = get_class_maps prog 
+let check (classes, funcs)  =
+    let class_maps = get_class_maps classes 
     in
-    let sast = get_sast class_maps prog
+    let sast = get_sast class_maps funcs
     in
     sast
     (* TODO: A lot of shit. But check is the main function so we need to add top

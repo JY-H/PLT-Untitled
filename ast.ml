@@ -77,12 +77,12 @@ type class_decl = {
 	interfaces: classid_list option;
 }
 
-type global_decls = {
+(*type global_decls = {
 	cdecls: class_decl list;
 	fdecls: func_decl list;
-}
+}*)
 
-type program = Program of global_decls
+type program = class_decl list * func_decl list
 
 (* Pretty-printing functions *)
 
@@ -218,8 +218,10 @@ let string_of_class_decl class_decl =
 	"\n}\n"
 
 let string_of_global_decls gdecls = 
-	String.concat "\n" (List.map string_of_class_decl gdecls.cdecls) ^
-	String.concat "\n" (List.map string_of_func_decl gdecls.fdecls)
+	String.concat "\n" (List.map string_of_class_decl (fst gdecls)) ^
+	String.concat "\n" (List.map string_of_func_decl (snd gdecls))
 
-let string_of_program program = match program with
-	Program gdecls -> string_of_global_decls gdecls
+let string_of_program program = string_of_global_decls program
+
+(*match program with
+	Program gdecls -> string_of_global_decls gdecls*)
