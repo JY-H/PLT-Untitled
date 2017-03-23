@@ -96,10 +96,23 @@ let get_class_maps cdecls reserved_map =
         )
     in List.fold_left map_class StringMap.empty cdecls
 
+(*
+let parse_stmt stmt = function
+      Ast.Block blk -> 
 
-(* TODO: Need to write stmt -> sstmt conversion. But this should be enough for
- * just hello_world
- *)
+let get_sbody_from_body stmt_list = 
+    let rec get_sstmt = function
+          hd::tl -> 
+              let sstmt = parse_stmt hd
+              in
+              sstmt::(get_sstmt tl)
+        | [] -> []
+    in
+    let sstmt_list = get_sstmt stmt_list
+    in
+    sstmt_list
+*)
+
 let get_sfdecl_from_fdecl fdecl =
     let func_sbody = (* get_sbody_from_body fdecl.body *) fdecl.body
     in
