@@ -34,3 +34,6 @@ make
 
 ### Issues
 
+### LRM Changelist
+* Allow global functions outside of class declarations (rather than just `main` as was originally proposed).
+* Remove `interface` from the list of functionalities.
