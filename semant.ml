@@ -12,6 +12,22 @@ type class_map = {
 }
 let global_func_map = StringMap.empty
 
+
+let get_reserved_funcs = 
+    let reserved_struct name return_t formals =
+        {
+            stype = return_t;
+            sfname = name;
+            sformals = formals;
+            sbody = [];
+        }
+    in
+    let reserved = [
+        reserved_struct "print" (Ast.Void) ([Formal(Ast.String, "string")]);
+    ]
+    in
+    reserved
+
 (* Helper function to get fully qualified names so that we can distinguish
  * between global functions and class functions of the same name
  *)
@@ -90,37 +106,39 @@ let get_sfdecl_from_fdecl fdecl =
     }
 
 
-let get_sast class_maps global_func_maps cdecls fdecls  =
+let get_sast class_maps global_func_maps reserved cdecls fdecls  =
     let find_main f = match f.sfname with 
         "main" -> true
         | _ -> false
     in
-    let get_main functions = 
+    let check_main functions = 
         let main_decls = List.find_all find_main functions
         in
         if (List.length main_decls < 1) then
             raise (Failure("Main not defined."))
         else if (List.length main_decls > 1) then
             raise (Failure("More than 1 main function defined."))
-        else
-            List.hd main_decls
     in 
     let get_sfdecls l f =
         let sfdecl = get_sfdecl_from_fdecl f in sfdecl::l
     in
     let sfdecls = List.fold_left get_sfdecls [] fdecls
     in
+    (* Check that there is one main function. *)
+    let _ = check_main sfdecls
+    in
     {
         classes = []; 
         functions = sfdecls;
-        main = get_main sfdecls;
+        reserved = reserved 
     }
 
 let check program = match program with
     Program(globals) ->  
+        let reserved_funcs = get_reserved_funcs in
         let global_func_map = get_global_func_map globals.fdecls in
         let class_maps = get_class_maps globals.cdecls in
-        let sast = get_sast class_maps global_func_map globals.cdecls globals.fdecls in
+        let sast = get_sast class_maps global_func_map reserved_funcs globals.cdecls globals.fdecls in
         sast
     (* TODO: A lot of shit. But check is the main function so we need to add top
      * level logic here. *)

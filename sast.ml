@@ -49,5 +49,5 @@ type sclass_decl = {
 type sprogram = {
     classes: sclass_decl list;
     functions: sfunc_decl list;
-    main: sfunc_decl;
+    reserved: sfunc_decl list;
 }
