@@ -221,5 +221,5 @@ let string_of_global_decls gdecls =
 	String.concat "\n" (List.map string_of_class_decl gdecls.cdecls) ^
 	String.concat "\n" (List.map string_of_func_decl gdecls.fdecls)
 
-let string_of_program program = match program with
+let string_of_program program = match program with 
 	Program gdecls -> string_of_global_decls gdecls

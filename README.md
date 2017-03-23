@@ -21,14 +21,19 @@ make
     ```
 
 ### TODO
-##### `hello_world` Immediate TODOs
-  * semant.ml: 
-    * Update to match parser and ast.
-    * Add `print` as a built-in function.
-  * codegen.ml:
-    * Fill in `func_stub_gen` and `func_body_gen`. 
-##### Others
-* Compile a list of necessary additions to the semantic checker.
+~`hello_world` Immediate TODOs~
+##### `semant.ml` TODOs:
+* Currently we do not fully walk and semantically verify the AST. Some parts are merely copied directly from the AST. (For example, see the `get_sfdecl_from_fdecl` function). Thus, we need to:
+  * Write `expr->sexpr` translation.
+  * Write `stmt->sstmt` translation (partially written).
+* This is necessary in order to further work on `codegen.ml`.
+##### `codegen.ml` TODOs:
+* Once we do another pass at `semant.ml`, we can flush out the different sections in `codegen.ml`. For details, see comments above some of the codegen functions.
+##### TESTING TODOs:
+* Remember to add additional testing scripts if you implement a new functionality.
 
 ### Issues
 
+### LRM Changelist
+* Allow global functions outside of class declarations (rather than just `main` as was originally proposed).
+* Remove `interface` from the list of functionalities.

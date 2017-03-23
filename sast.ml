@@ -31,7 +31,8 @@ type sfunc_decl = {
     stype: typ;
     sfname: string;
     sformals: formal_param list;
-    sbody: sstmt list;
+    (* sbody: sstmt list; *)
+    sbody: stmt list;
 }
 
 type sclass_body = {
@@ -48,5 +49,5 @@ type sclass_decl = {
 type sprogram = {
     classes: sclass_decl list;
     functions: sfunc_decl list;
-    main: sfunc_decl list;
+    reserved: sfunc_decl list;
 }
