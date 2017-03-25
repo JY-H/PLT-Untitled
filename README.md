@@ -21,15 +21,16 @@ make
     ```
 
 ### TODO
-~`hello_world` Immediate TODOs~
-##### `semant.ml` TODOs:
-* Currently we do not fully walk and semantically verify the AST. Some parts are merely copied directly from the AST. (For example, see the `get_sfdecl_from_fdecl` function). Thus, we need to:
-  * Write `expr->sexpr` translation.
-  * Write `stmt->sstmt` translation (partially written).
-* This is necessary in order to further work on `codegen.ml`.
-##### `codegen.ml` TODOs:
-* Once we do another pass at `semant.ml`, we can flush out the different sections in `codegen.ml`. For details, see comments above some of the codegen functions.
-##### TESTING TODOs:
+Every pull request should come with a test case to prove that the newly implemented functionality fully works.
+
+#### Apr.1st: get everything you can do in main (aka everything you can do in C) done
+* priority:
+* assignment, binop, unop
+* cast
+* if, elseif, elseifs
+* for, while, break, continue
+
+#### TESTING TODOs:
 * Remember to add additional testing scripts if you implement a new functionality.
 
 ### Issues

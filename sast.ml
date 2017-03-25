@@ -4,13 +4,17 @@ type sexpr =
       SIntLit of int
     | SBoolLit of bool
     | SFloatLit of float
+    | SCharLit of char
     | SStringLit of string
-    | SId of string
+    | SId of string * typ
+    | SNull
     | SBinop of sexpr * op * sexpr * typ
     | SUnop of uop * sexpr * typ
-    | SAssign of string * sexpr * typ
-    | SCast of typ * sexpr * typ
-    | SCall of string * sexpr list * typ
+    | SAssign of sexpr * sexpr * typ
+    | SCast of typ * sexpr
+    | SFieldAccess of sexpr * string * typ
+    | SCall of string * sexpr list
+    | SObjCreate of typ * sexpr list
     | SNoexpr
 
 type sstmt = 
@@ -31,8 +35,7 @@ type sfunc_decl = {
     stype: typ;
     sfname: string;
     sformals: formal_param list;
-    (* sbody: sstmt list; *)
-    sbody: stmt list;
+    sbody: sstmt list;
 }
 
 type sclass_body = {
