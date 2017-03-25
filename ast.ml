@@ -1,13 +1,13 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
-open Char
+(*open Char*)
 
 type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 	Greater | Geq | And | Or | In | Append | Concat
 
 type uop = Neg | Not | Remove
 
-type typ = Int | Float | Bool | Char | String | Void |
+type typ = Int | Float | Bool | Char | String | Void | Null_t |
 	Tuple of typ | Lst of typ | Obj of string
 
 (* typ ID, e.g. int x, int[] y *)
@@ -92,6 +92,7 @@ let rec string_of_typ = function
 	| Bool -> "bool"
 	| String -> "string"
 	| Void -> "void"
+        | Null_t -> "null"
 	| Char -> "char"
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
 	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
