@@ -7,14 +7,13 @@ module StringMap = Map.Make(String)
 
 type class_map = {
     class_decl: Ast.class_decl;
-    functions: Ast.func_decl StringMap.t;
-    fields: Ast.field StringMap.t; 
+    class_methods: Ast.func_decl StringMap.t;
+    class_fields: Ast.field StringMap.t;
 }
 let global_func_map = StringMap.empty
 
-
+let reserved_list =
 (* Helper function to get all built-in functions. *)
-let get_reserved_funcs = 
     let reserved_struct name return_t formals =
         {
             stype = return_t;
@@ -29,7 +28,6 @@ let get_reserved_funcs =
     in
     reserved
 
-let reserved_list = get_reserved_funcs
 let reserved_map = List.fold_left (
             fun map f -> StringMap.add f.sfname f map
         ) StringMap.empty reserved_list
@@ -93,9 +91,9 @@ let get_class_maps cdecls reserved_map =
         else
             StringMap.add cdecl.cname
             {
-                fields = List.fold_left map_fields StringMap.empty
+                class_fields = List.fold_left map_fields StringMap.empty
                     cdecl.cbody.fields;
-                functions = List.fold_left map_functions StringMap.empty
+                class_methods = List.fold_left map_functions StringMap.empty
                     cdecl.cbody.methods;
                 class_decl = cdecl;
             } map
@@ -215,7 +213,7 @@ let get_class_fdecls class_maps =
             (* Then extract fdecls within each cdecl and convert to sfdecl. *)
             let get_class_fnames result = StringMap.fold (
                 fun fname f l -> (get_sfdecl_from_fdecl f)::l
-            ) c.functions result 
+            ) c.class_methods result
             in
             get_class_fnames l
     ) class_maps []
