@@ -13,12 +13,14 @@ LLI="lli"
 LLC="llc"
 
 # Path to the C compiler
-CC="cc"
+CC="gcc"
 
 # Path to the microc compiler.  Usually "./microc.native"
 # Try "_build/microc.native" if ocamlbuild was unable to create a symbolic link.
-MICROC="./microc.native"
-#MICROC="_build/microc.native"
+DECAF="./decaf.native"
+#DECAF="_build/decaf.native"
+
+file_ext="dcf"
 
 # Set time limit for all operations
 ulimit -t 30
@@ -31,7 +33,7 @@ globalerror=0
 keep=0
 
 Usage() {
-    echo "Usage: testall.sh [options] [.mc files]"
+    echo "Usage: testall.sh [options] [.${file_ext} files]"
     echo "-k    Keep intermediate files"
     echo "-h    Print this help"
     exit 1
@@ -79,24 +81,23 @@ RunFail() {
 
 Check() {
     error=0
-    basename=`echo $1 | sed 's/.*\\///
-                             s/.mc//'`
-    reffile=`echo $1 | sed 's/.mc$//'`
+    basename=$(echo $1 | sed 's/.${file_ext}//' | cut -f 1 -d '.')
+    reffile=$(echo $1 | sed 's/.${file_ext}$//')
     basedir="`echo $1 | sed 's/\/[^\/]*$//'`/."
 
-    echo -n "$basename..."
+    echo -n "${basename}..."
 
     echo 1>&2
-    echo "###### Testing $basename" 1>&2
+    echo "###### Testing ${basename}" 1>&2
 
     generatedfiles=""
 
-    generatedfiles="$generatedfiles ${basename}.ll ${basename}.s ${basename}.exe ${basename}.out" &&
-    Run "$MICROC" "<" $1 ">" "${basename}.ll" &&
-    Run "$LLC" "${basename}.ll" ">" "${basename}.s" &&
-    Run "$CC" "-o" "${basename}.exe" "${basename}.s" "printbig.o" &&
-    Run "./${basename}.exe" > "${basename}.out" &&
-    Compare ${basename}.out ${reffile}.out ${basename}.diff
+    generatedfiles="${generatedfiles} ${basename}.ll ${basename}.s ${basename} ${basename}.out" &&
+    Run "${DECAF} -l" "<" $1 "| tail -n+3" ">" "${basename}.ll" &&
+    Run "${LLC}" "${basename}.ll" ">" "${basename}.s" &&
+    Run "${CC}" "-o" "${basename}" "${basename}.s" &&
+    Run "./${basename}" ">" "${basename}.out" &&
+    Compare ${basename}.cmp ${basename}.out ${basename}.diff
 
     # Report the status and clean up the generated files
 
@@ -108,27 +109,26 @@ Check() {
 	echo "###### SUCCESS" 1>&2
     else
 	echo "###### FAILED" 1>&2
-	globalerror=$error
+	globalerror=${error}
     fi
 }
 
 CheckFail() {
     error=0
-    basename=`echo $1 | sed 's/.*\\///
-                             s/.mc//'`
-    reffile=`echo $1 | sed 's/.mc$//'`
+    basename=$(echo $1 | sed 's/.${file_ext}//' | cut -f 1 -d '.')
+    reffile=`echo $1 | sed 's/.${file_ext}$//'`
     basedir="`echo $1 | sed 's/\/[^\/]*$//'`/."
 
-    echo -n "$basename..."
+    echo -n "${basename}..."
 
     echo 1>&2
-    echo "###### Testing $basename" 1>&2
+    echo "###### Testing ${basename}" 1>&2
 
     generatedfiles=""
 
-    generatedfiles="$generatedfiles ${basename}.err ${basename}.diff" &&
-    RunFail "$MICROC" "<" $1 "2>" "${basename}.err" ">>" $globallog &&
-    Compare ${basename}.err ${reffile}.err ${basename}.diff
+    generatedfiles="${generatedfiles} ${basename}.out ${basename}.diff" &&
+    RunFail "${DECAF}" "<" $1 "2>" "${basename}.out" ">>" ${globallog} &&
+    Compare ${basename}.cmp ${basename}.out ${basename}.diff
 
     # Report the status and clean up the generated files
 
@@ -165,18 +165,12 @@ LLIFail() {
 
 which "$LLI" >> $globallog || LLIFail
 
-if [ ! -f printbig.o ]
-then
-    echo "Could not find printbig.o"
-    echo "Try \"make printbig.o\""
-    exit 1
-fi
-
 if [ $# -ge 1 ]
 then
     files=$@
 else
-    files="tests/test_*.mc tests/fail_*.mc"
+	# TODO: Uncomment this when fail tests ae put in
+    files="tests/test_*.${file_ext}"
 fi
 
 for file in $files

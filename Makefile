@@ -15,9 +15,11 @@ decaf.native :
 .PHONY : clean
 clean :
 	ocamlbuild -clean
-	rm -rf testall.log *.diff decaf scanner.ml parser.ml parser.mli
-	rm -rf *.cmx *.cmi *.cmo *.cmx *.o
-	rm -rf *.ll *.s
+	rm -f testall.log *.diff decaf scanner.ml parser.ml parser.mli
+	rm -f *.cmx *.cmi *.cmo *.cmx *.o
+	rm -f *.ll *.s
+	rm -f tests/*.ll tests/*.s
+	rm -f tests/menhir/*.output
 
 # More detailed: build using ocamlc/ocamlopt + ocamlfind to locate LLVM
 

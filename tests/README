@@ -1,0 +1,16 @@
+How to add test (success) cases:
+- Add DECAF (.dcf) file.
+- Add compare (.cmp) file that gives expected output.
+- Run testall.sh (make before using testall)
+
+How to add test (fail) cases:
+- Add DECAF (.dcf) file.
+- Add compare (.cmp) file that gives expected error.
+- Run testall.sh (make before using testall)
+
+How to read output:
+- All output put in tests/ folder
+- Executable produced (if success case)
+- Output file (.out) is output of binary executable (or error message for fail
+  cases)
+- Diff (.diff) file is diff between expected (.cmp) and actual (.out).
