@@ -12,13 +12,14 @@ http://llvm.moe/ocaml/
 
 *)
 open Llvm
+open Ast
 open Sast
+open Semant
 
 module L = Llvm
-module A = Ast
+module A = Ast (* I would like to get rid of these (now that we opened these modules, we can directly use them anyways), but have not made any changes yet in case someone feel strongly against it *)
+
 module Hash = Hashtbl
-(* Add semantic checker *)
-(* module Sem = Semant *)
 
 module StringMap = Map.Make(String)
 let global_classes:(string, L.lltype) Hash.t = Hash.create 50
@@ -58,29 +59,23 @@ and func_lookup fname = match (L.lookup_function fname codegen_module) with
 and string_gen llbuilder s =
     L.build_global_stringptr s "tmp" llbuilder
 
-(* For both sstmt_gen and sexpr_gen:
-    * Everything here needs to be converted to sast format. Eg, it should be
-    * Sast.SBlock st -> ...
-    * However since right now we are using the func_body without
-    * modification/semantic checking, we are doing this. I suggest working on
-    * the semant.ml first to get expr->sexpr, stmt->sstmt translation working.
-    *
+(*
  * Additionally, this isn't the full case coverage, so we need to add that as
  * well.
  *)
 and sstmt_gen llbuilder = function
-      A.Block st -> List.hd(List.map (sstmt_gen llbuilder) st)
-    | A.Expr sexpr -> sexpr_gen llbuilder sexpr
+      SBlock st -> List.hd(List.map (sstmt_gen llbuilder) st)
+    | SExpr(sexpr,t) -> sexpr_gen llbuilder sexpr
     | _ -> raise (Failure ("Unknown statement reached."))
 
 and sexpr_gen llbuilder = function
-      A.IntLit(i) -> L.const_int i32_t i
-    | A.BoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
-    | A.FloatLit(f) -> L.const_float f_t f
-    | A.StringLit(s) -> string_gen llbuilder s
-    | A.FuncCall("print", sexpr_list) -> call_gen llbuilder "printf" sexpr_list
+      SIntLit(i) -> L.const_int i32_t i
+    | SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
+    | SFloatLit(f) -> L.const_float f_t f
+    | SStringLit(s) -> string_gen llbuilder s
+    | SCall("print", sexpr_list) -> call_gen llbuilder "printf" sexpr_list
     A.Void
-    | A.Noexpr -> L.const_int i32_t 0
+    | SNoexpr -> L.const_int i32_t 0
     | _ -> raise (Failure ("Expression type not recognized.")) 
 
 
@@ -96,7 +91,7 @@ and print_gen llbuilder sexpr_list =
     let params = List.map (fun expr -> sexpr_gen llbuilder expr) sexpr_list
     in
     L.build_call (func_lookup "printf") 
-        (Array.of_list ((sexpr_gen llbuilder (A.StringLit("%s")))::params))
+        (Array.of_list ((sexpr_gen llbuilder (SStringLit("%s")))::params))
         "printf" llbuilder
     
 
@@ -141,10 +136,7 @@ let func_body_gen sfdecl =
     in
     let _ = init_params func sfdecl.sformals
     in
-    (* TODO: Corresponds to the above comments. Block needs to be changed to
-     * SBlock once support is added in semant.ml
-     *)
-    let _ = sstmt_gen llbuilder (Block(sfdecl.sbody))
+    let _ = sstmt_gen llbuilder (SBlock(sfdecl.sbody))
     in
     (* TODO: Need to generalize this to fit all return types. Right now just 
      * int. 
