@@ -6,10 +6,27 @@ open Sast
 module StringMap = Map.Make(String)
 
 type class_map = {
-    class_decl: Ast.class_decl;
-    class_methods: Ast.func_decl StringMap.t;
-    class_fields: Ast.field StringMap.t;
+	class_decl:		Ast.class_decl;
+	class_methods:	Ast.func_decl StringMap.t;
+	class_fields:	Ast.field StringMap.t;
 }
+
+type env = {
+	env_name:		string;
+	env_locals:		typ StringMap.t;
+	env_params:		Ast.formal_param StringMap.t;
+	env_ret_typ:	typ;
+	env_reserved:	Sast.sfunc_decl list;
+}
+
+let update_env_name env name = {
+	env_name =		name;
+	env_locals =	env.env_locals;
+	env_params = 	env.env_params;
+	env_ret_typ =	env.env_ret_typ;
+	env_reserved = 	env.env_reserved;
+}
+
 let global_func_map = StringMap.empty
 
 let reserved_list =
@@ -99,65 +116,8 @@ let get_class_maps cdecls reserved_map =
             } map
         )
     in List.fold_left map_class StringMap.empty cdecls
- 
-let rec get_sexprl el = match el with
-              [] -> []
-            | head::tail -> get_sexpr head :: (get_sexprl tail)
 
-and check_func_call fname el =
-    (*currently only support checks for built-in functions*)
-    let sel = get_sexprl el in
-    let check_params formals actuals =
-        (*very basic check, need to support type check too*)
-        let len1 = List.length formals in
-        let len2 = List.length actuals in
-        if len1 <> len2 then
-            raise (Failure("Formal and actual argument numbers mismatch."))
-        else
-            actuals
-    in
-    let the_func = StringMap.find fname reserved_map in
-    let actuals = check_params the_func.sformals sel in
-    SCall(fname, actuals)
-
-and get_sexpr = function
-              IntLit i -> SIntLit(i)
-            | BoolLit b -> SBoolLit(b)
-            | FloatLit f -> SFloatLit(f)
-            | CharLit c -> SCharLit(c)
-            | StringLit s -> SStringLit(s)
-            | Id s -> SId(s, Void) (*void dummy, need to extract real type*)
-            | Null -> SNull
-(*          to be implemented
- *          | Binop(e1, op, e2) ->  check_binop e1 op e2
-            | Unop(op, e) -> check_uop op e
-            | Assign(e1, e2) -> check_assign e1 e2
-            | Cast(t, e) -> check_cast t e
-            | FieldAccess(e, s) -> check_field_access e s
-            | MethodCall*)
-            | FuncCall(s, el) -> check_func_call s el
-(*            | ObjCreate*)
-            | Self -> SId("self", Void) (*void dummy*)
-(*            | Super*)
-            | Noexpr -> SNoexpr
-            | _ -> raise(Failure("cannot convert to sexpr")) (*dummy, delete later*)
-
-let rec check_block = function
-              [] -> SBlock([SExpr(SNoexpr, Void)])
-            | blk -> SBlock(get_sstmtl blk)
-
-and check_expr e =
-    let se = get_sexpr e in
-    let t = get_type_from_sexpr se in
-    SExpr(se, t)
-
-and check_return e =
-    (*to do useful check we need some information about this function*)
-    let se = get_sexpr e in
-    let t = get_type_from_sexpr se
-    in SReturn(se, t)
-
-and get_type_from_sexpr = function
+let get_type_from_sexpr = function
               SIntLit(_) -> Int
             | SBoolLit(_) -> Bool
             | SFloatLit(_) -> Float
@@ -170,19 +130,95 @@ and get_type_from_sexpr = function
             | SAssign(_, _, t) -> t
             | SCast(t, _) -> t
             | SFieldAccess(_, _, t) -> t
-            | SCall(_, _) -> Void (*should be function call return type, fix later*)
+            | SCall(_, _, t) -> t
             | SObjCreate(t, _) -> t
             | SNoexpr -> Void
-
-and get_sstmtl stmtl =
-    let rec helper = function
+ 
+let rec get_sexprl env el =
+	let env_ref = ref(env) in
+	let rec helper = function
+		hd :: tl -> let a_head, env = get_sexpr !env_ref hd in
+			env_ref := env;
+			a_head :: (helper tl)
+		| [] -> []
+	in (helper el), !env_ref
+(*match el with
               [] -> []
-            | head::tail -> (get_sstmt head) :: (helper tail)
-    in helper stmtl
-and get_sstmt = function
-              Block blk -> check_block blk
-            | Expr e -> check_expr e
-            | Return e -> check_return e
+            | head::tail -> get_sexpr head :: (get_sexprl tail)*)
+
+and check_func_call env fname el =
+    (*currently only support checks for built-in functions*)
+    let sel, env = get_sexprl env el in
+    let check_param formal param =
+		let f_typ = match formal with Formal(t, _) -> t | _ -> Void in
+		let p_typ = get_type_from_sexpr param in
+		if (f_typ = p_typ) then param
+		else
+			raise(Failure("Incorrect type passed to function")) 
+            in
+	let handle_params (formals) params =
+		(* Should do some formal/param pattern matching later *)
+		(* Otherwise currently a simple length check *)
+	    let len1 = List.length formals in
+        let len2 = List.length params in
+        if len1 <> len2 then
+            raise (Failure("Formal and actual argument numbers mismatch."))
+        else
+            List.map2 check_param formals sel
+	in
+	
+	(* TODO: Define full name
+	let full_name = env.env_name ^ "." ^ fname in *)
+	try (
+		let the_func = StringMap.find fname reserved_map in
+		let actuals = handle_params the_func.sformals sel in
+		SCall(fname, actuals, the_func.stype) )
+	with | Not_found ->
+		raise (Failure("Function " ^ fname ^ " not found."))
+
+and get_sexpr env expr = match expr with
+              IntLit i -> SIntLit(i), env
+            | BoolLit b -> SBoolLit(b), env
+            | FloatLit f -> SFloatLit(f), env
+            | CharLit c -> SCharLit(c), env
+            | StringLit s -> SStringLit(s), env
+            | Id s -> SId(s, Void), env
+            | Null -> SNull, env
+(*          to be implemented
+ *          | Binop(e1, op, e2) ->  check_binop e1 op e2
+            | Unop(op, e) -> check_uop op e
+            | Assign(e1, e2) -> check_assign e1 e2
+            | Cast(t, e) -> check_cast t e
+            | FieldAccess(e, s) -> check_field_access e s
+            | MethodCall*)
+            | FuncCall(str, el) -> check_func_call env str el, env
+(*            | ObjCreate*)
+            | Self -> SId("self", Void), env (*void dummy*)
+(*            | Super*)
+            | Noexpr -> SNoexpr, env
+            | _ -> raise(Failure("cannot convert to sexpr")) (*dummy, delete later*)
+
+let rec check_block sl env = match sl with
+	  [] -> SBlock([SExpr(SNoexpr, Void)])
+	| _ ->
+		let sl, _ = get_sstmtl env sl in
+		SBlock(sl)
+
+and check_expr e env =
+    let se, env = get_sexpr env e in
+    let t = get_type_from_sexpr se in
+    SExpr(se, t)
+
+and check_return e env =
+    (*to do useful check we need some information about this function*)
+    let se, env = get_sexpr env e in
+    let t = get_type_from_sexpr se
+    in SReturn(se, t)
+
+and get_sstmt env stmt = match stmt with
+              Block blk -> check_block blk env, env
+            | Expr e -> check_expr e env, env
+            | Return e -> check_return e env, env
 (*            | If(e, s1, s2) -> check_if e s1 s2
             | For(e1, e2, e3, s) -> check_for e1 e2 e3 s
             | While(e, s) -> check_while e s
@@ -195,8 +231,34 @@ and get_sstmt = function
             *)
             | _ -> raise(Failure("Idk what stmt you are talking abt"))
 
-let get_sfdecl_from_fdecl fdecl =
-    let func_sbody = get_sstmtl fdecl.body
+and get_sstmtl env stmtl =
+	let env_ref = ref(env) in
+    let rec helper = function
+			head :: tail ->
+				let sstmt, env = get_sstmt !env_ref head in
+				env_ref := env;
+				sstmt :: (helper tail)
+			| [] -> []
+	in
+	let sstmts = (helper stmtl), !env_ref in sstmts
+	(*(get_sstmt head) :: (helper tail)
+    in helper stmtl*)
+
+let get_sfdecl_from_fdecl reserved fdecl =
+	let get_params_map map formal = match formal with
+		Formal(typ, name) -> StringMap.add name formal map
+		| _ -> map
+	in
+	let parameters = List.fold_left
+		get_params_map StringMap.empty (fdecl.formals) in
+	let env = {
+		env_name = ""; (* Should be class name once classes happen *)
+		env_locals = StringMap.empty;
+		env_params = parameters;
+		env_ret_typ = fdecl.return_typ;
+		env_reserved = reserved;
+	} in
+    let func_sbody, tmp_env = get_sstmtl env fdecl.body
     in
     {
         stype = fdecl.return_typ;
@@ -205,6 +267,7 @@ let get_sfdecl_from_fdecl fdecl =
         sbody = func_sbody;
     }
 
+(* TODO: Things start screaming around here *)
 (* Helper method to extract sfdecls from fdecls within classes. *)
 let get_class_fdecls class_maps = 
     (* First use StringMap.fold to extract class decls from class_maps *)

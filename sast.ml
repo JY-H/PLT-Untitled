@@ -13,7 +13,7 @@ type sexpr =
     | SAssign of sexpr * sexpr * typ
     | SCast of typ * sexpr
     | SFieldAccess of sexpr * string * typ
-    | SCall of string * sexpr list
+    | SCall of string * sexpr list * typ
     | SObjCreate of typ * sexpr list
     | SNoexpr
 
