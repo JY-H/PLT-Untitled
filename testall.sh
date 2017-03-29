@@ -169,8 +169,7 @@ if [ $# -ge 1 ]
 then
     files=$@
 else
-	# TODO: Uncomment this when fail tests ae put in
-    files="tests/test_*.${file_ext}"
+    files="tests/test_*.${file_ext} tests/fail_*.${file_ext}"
 fi
 
 for file in $files

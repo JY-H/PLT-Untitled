@@ -17,8 +17,8 @@ clean :
 	ocamlbuild -clean
 	rm -f testall.log *.diff decaf scanner.ml parser.ml parser.mli
 	rm -f *.cmx *.cmi *.cmo *.cmx *.o
-	rm -f *.ll *.s
-	rm -f tests/*.ll tests/*.s
+	rm -f *.ll *.s a.out
+	rm -f tests/*.ll tests/*.s tests/*.out tests/*.diff
 	rm -f tests/menhir/*.output
 
 # More detailed: build using ocamlc/ocamlopt + ocamlfind to locate LLVM
