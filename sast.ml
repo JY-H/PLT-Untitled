@@ -13,7 +13,7 @@ type sexpr =
     | SAssign of sexpr * sexpr * typ
     | SCast of typ * sexpr
     | SFieldAccess of sexpr * string * typ
-    | SCall of string * sexpr list
+    | SCall of string * sexpr list * typ
     | SObjCreate of typ * sexpr list
     | SNoexpr
 
@@ -23,7 +23,6 @@ type sstmt =
     | SReturn of sexpr * typ
     | SIf of sexpr * sstmt * sstmt
     | SElseif of sexpr * sstmt
-    | SElseifs of sexpr * sstmt * sstmt list * sstmt
     | SFor of sexpr * sexpr * sexpr * sstmt
     | SWhile of sexpr * sstmt
     | SBreak
