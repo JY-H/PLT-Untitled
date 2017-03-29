@@ -96,12 +96,74 @@ and sexpr_gen llbuilder = function
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
 	| SFloatLit(f) -> L.const_float f_t f
 	| SStringLit(s) -> string_gen llbuilder s
+	| SBinop(sexpr1, op, sexpr2, typ) ->
+		binop_gen llbuilder sexpr1 op sexpr2 typ
+	| SUnop(op, sexpr, typ) ->
+		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCall("print", sexpr_list, typ) -> call_gen llbuilder "printf" sexpr_list
 		A.Void
 	| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise (Failure ("Expression type not recognized.")) 
 
+and binop_gen llbuilder sexpr1 op sexpr2 typ =
+	let lexpr1 = sexpr_gen llbuilder sexpr1 in
+	let lexpr2 = sexpr_gen llbuilder sexpr2 in
+
+	let typ1 = get_type_from_sexpr sexpr1 in
+	let typ2 = get_type_from_sexpr sexpr2 in
+
+	let int_ops expr1 binop expr2 = match binop with
+		  Add -> L.build_add expr1 expr2 "int_addtmp" llbuilder
+		| Sub -> L.build_sub expr1 expr2 "int_subtmp" llbuilder
+		| Mult -> L.build_mul expr1 expr2 "int_multop" llbuilder
+		| Div -> L.build_sdiv expr1 expr2 "int_divop" llbuilder
+		| Mod -> L.build_srem expr1 expr2 "int_modop" llbuilder
+		| Veq -> L.build_icmp L.Icmp.Eq expr1 expr2 "int_eqtmp" llbuilder
+		| Vneq -> L.build_icmp L.Icmp.Ne expr1 expr2 "int_neqtmp" llbuilder
+		| Less -> L.build_icmp L.Icmp.Slt expr1 expr2 "int_lesstmp" llbuilder
+		| Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
+		| Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
+		| Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
+		| _ -> raise(Failure("Unsupported operator for integers"))
+	in
+	
+	let float_ops expr1 binop expr2 = match binop with
+		  Add -> L.build_fadd expr1 expr2 "flt_addtmp" llbuilder
+		| Sub -> L.build_fsub expr1 expr2 "flt_subtmp" llbuilder
+		| Mult -> L.build_fmul expr1 expr2 "flt_multop" llbuilder
+		| Div -> L.build_fdiv expr1 expr2 "flt_divop" llbuilder
+		| Mod -> L.build_frem expr1 expr2 "flt_modop" llbuilder
+		| Veq -> L.build_fcmp L.Fcmp.Oeq expr1 expr2 "flt_eqtmp" llbuilder
+		| Vneq -> L.build_fcmp L.Fcmp.One expr1 expr2 "flt_neqtmp" llbuilder
+		| Less -> L.build_fcmp L.Fcmp.Ult expr1 expr2 "flt_lesstmp" llbuilder
+		| Leq -> L.build_fcmp L.Fcmp.Ole expr1 expr2 "flt_leqtmp" llbuilder
+		| Greater -> L.build_fcmp L.Fcmp.Ogt expr1 expr2 "flt_greatertmp" llbuilder
+		| Geq -> L.build_fcmp L.Fcmp.Oge expr1 expr2 "flt_geqtmp" llbuilder
+		| _ -> raise(Failure("Unsupported operator for floats"))
+	in
+
+	(* TODO: do something for req/rneq here *)
+	
+	match typ with
+		  Int | Bool -> int_ops lexpr1 op lexpr2
+		| Float -> float_ops lexpr1 op lexpr2
+		| _ -> raise(Failure("Unrecognized data type in binop"))
+
+and unop_gen llbuilder unop sexpr typ =
+	let unop_lval = sexpr_gen llbuilder sexpr in
+	
+	let build_unop op unop_typ lval = match op, unop_typ with
+		  Neg, Int -> L.build_neg lval "neg_int_tmp" llbuilder
+		| Neg, Float -> L.build_fneg lval "neg_flt_tmp" llbuilder
+		| Not, Bool -> L.build_not lval "not_bool_tmp" llbuilder
+		| _ -> raise(Failure("Unsupported unop for " ^ string_of_uop op ^ 
+			" and type " ^ string_of_typ typ))
+	in
+
+	match typ with
+		  Int | Float | Bool -> build_unop unop typ unop_lval
+		| _ -> raise(Failure("Invalid type for unop: " ^ string_of_typ typ))
 
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
@@ -157,7 +219,6 @@ and print_gen llbuilder sexpr_list =
 		(Array.of_list ((sexpr_gen llbuilder (SStringLit("%s")))::params))
 		"printf" llbuilder
 
-(* TODO: write*)
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id =
 	let noop, ltyp = match typ with

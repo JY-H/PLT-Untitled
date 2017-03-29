@@ -167,11 +167,91 @@ let rec get_sexprl env el =
 			  [] -> []
 			| head::tail -> get_sexpr head :: (get_sexprl tail)*)
 
+(* Check a binop is valid *)
+and check_binop env expr1 op expr2 =
+	let sexpr1, _ = get_sexpr env expr1 in
+	let sexpr2, _ = get_sexpr env expr2 in
+
+	let typ1 = get_type_from_sexpr sexpr1 in
+	let typ2= get_type_from_sexpr sexpr2 in
+
+	match op with
+		  Add | Sub | Mult | Div | Mod ->
+			check_arithmetic_op sexpr1 sexpr2 op typ1 typ2, env
+		| Less | Leq | Greater | Geq ->
+			check_relational_op sexpr1 sexpr2 op typ1 typ2, env
+		| Veq | Vneq | Req | Rneq ->
+			check_equality_op sexpr1 sexpr2 op typ1 typ2, env
+		| And | Or ->
+			check_logical_op sexpr1 sexpr2 op typ1 typ2, env
+		(* TODO: list/tuple ops *)
+		| _ -> raise(Failure("Operation " ^ string_of_op op ^
+			" not supported."))
+
+(* Check an arithmetic operation is valid *)
+and check_arithmetic_op sexpr1 sexpr2 op typ1 typ2 = match typ1, typ2 with
+	  Int, Int | Float, Float -> SBinop(sexpr1, op, sexpr2, typ1)
+	(* NOTE: I didn't allow char ops but we could allow it *)
+	| _ -> raise(Failure("Arithmetic operation not allowed between types " ^
+		string_of_typ typ1 ^ " and " ^ string_of_typ typ2))
+
+(* Check a relational operation is valid *)
+and check_relational_op sexpr1 sexpr2 op typ1 typ2 = match typ1, typ2 with
+	  Int, Int | Float, Float -> SBinop(sexpr1, op, sexpr2, Bool)
+	| _ -> raise(Failure("Relational operation not allowed between types " ^
+		string_of_typ typ1 ^ " and " ^ string_of_typ typ2))
+
+(* Check an equality operation is valid *)
+and check_equality_op sexpr1 sexpr2 op typ1 typ2 = match op with
+	  Veq | Vneq -> (match typ1, typ2 with
+		  Int, Int | Float, Float | Bool, Bool | Char, Char | String, String ->
+			SBinop(sexpr1, op, sexpr2, typ1)
+		| _ -> raise(Failure("Value equality/inequality operators cannot be " ^
+			"used for types " ^
+			string_of_typ typ1 ^ " and " ^ string_of_typ typ2)))
+	| Req | Rneq -> (match typ1, typ2 with
+			(* Superclasses (and classes in general) don't exist so this should
+			be replaced*)
+		  Obj(classname1), Obj(classname2) ->
+			if classname1 = classname2 then
+				SBinop(sexpr1, op, sexpr2, typ1)
+			else
+				raise(Failure("Unmatching class types used in referential " ^
+				"equality/inequality operation"))
+		| _ -> raise(Failure("Referential equality/inequality operators " ^
+			"cannot be used for types " ^
+			string_of_typ typ1 ^ " and " ^ string_of_typ typ2)))
+
+(* Check a logical operation is valid *)
+and check_logical_op sexpr1 sexpr2 op typ1 typ2 = match typ1, typ2 with
+	  Bool, Bool -> SBinop(sexpr1, op, sexpr2, Bool)
+	| _ -> raise(Failure("Boolean operation only allowed between two boolean" ^
+		"expressions"))
+
+and check_unop env op expr =
+	let get_neg_op uop sexpr typ = match uop with
+		  Neg -> SUnop(uop, sexpr, typ)
+		| _ -> raise(Failure("Illegal unary operator applied to numeric type"))
+	in
+	let get_not_op uop sexpr typ = match uop with
+		  Not -> SUnop(uop, sexpr, typ)
+		| _ -> raise(Failure("Illegal unary operator applied to boolean type"))
+	in
+
+	let sexpr, _ = get_sexpr env expr in
+	let typ = get_type_from_sexpr sexpr in
+	match typ with
+		  Int | Float -> get_neg_op op sexpr typ, env
+		| Bool -> get_not_op op sexpr typ, env
+		| _ -> raise(Failure("Unop can only be applied to numeric or boolean" ^
+			"types"))
+
 (* Check assignment, returns SAssign on success *)
 and check_assign env expr1 expr2 =
 	let env_ref = ref env in
 
 	let sexpr1, env  = get_sexpr env expr1 in
+	env_ref := env;
 	let sexpr2, env = get_sexpr env expr2 in
 	env_ref := env;
 
@@ -229,9 +309,8 @@ and get_sexpr env expr = match expr with
 	| StringLit(s) -> SStringLit(s), env
 	| Id(id) -> SId(id, (get_id_typ env id)), env
 	| Null -> SNull, env
-(*			to be implemented
-	| Binop(e1, op, e2) ->	check_binop e1 op e2
-	| Unop(op, e) -> check_uop op e*)
+	| Binop(e1, op, e2) ->	check_binop env e1 op e2
+	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	(*| Cast(t, e) -> check_cast t e
 	| FieldAccess(e, s) -> check_field_access e s
