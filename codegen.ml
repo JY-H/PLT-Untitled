@@ -73,7 +73,7 @@ and sexpr_gen llbuilder = function
     | SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
     | SFloatLit(f) -> L.const_float f_t f
     | SStringLit(s) -> string_gen llbuilder s
-    | SCall("print", sexpr_list) -> call_gen llbuilder "printf" sexpr_list
+    | SCall("print", sexpr_list, typ) -> call_gen llbuilder "printf" sexpr_list
     A.Void
     | SNoexpr -> L.const_int i32_t 0
     | _ -> raise (Failure ("Expression type not recognized.")) 

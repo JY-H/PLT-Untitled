@@ -23,6 +23,7 @@ type sstmt =
     | SReturn of sexpr * typ
     | SIf of sexpr * sstmt * sstmt
     | SElseif of sexpr * sstmt
+	(* TODO: remove *)
     | SElseifs of sexpr * sstmt * sstmt list * sstmt
     | SFor of sexpr * sexpr * sexpr * sstmt
     | SWhile of sexpr * sstmt

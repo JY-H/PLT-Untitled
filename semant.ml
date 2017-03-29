@@ -215,6 +215,15 @@ and check_return e env =
     let t = get_type_from_sexpr se
     in SReturn(se, t)
 
+(* Verify local type and add to local vars *)
+(* TODO: write *)
+and check_local_var typ id expr env =
+	if StringMap.mem id env.env_locals then
+		raise(Failure("Duplicate local declaration: " ^ id))
+	else
+		(* TODO: fix this to actually add expression *)
+		SLocalVar(typ, id, SNoexpr)
+
 and get_sstmt env stmt = match stmt with
               Block blk -> check_block blk env, env
             | Expr e -> check_expr e env, env
@@ -223,9 +232,10 @@ and get_sstmt env stmt = match stmt with
             | For(e1, e2, e3, s) -> check_for e1 e2 e3 s
             | While(e, s) -> check_while e s
             | Break -> check_break
-            | Continue -> check_continue
-            | LocalVar(t, str, e) -> handle_local t str e
-            | TryCatch
+            | Continue -> check_continue*)
+            | LocalVar(t, str, e) ->
+				check_local_var t str e env, env
+(*            | TryCatch
             | Catch
             | Throw
             *)
@@ -246,7 +256,7 @@ and get_sstmtl env stmtl =
 
 let get_sfdecl_from_fdecl reserved fdecl =
 	let get_params_map map formal = match formal with
-		Formal(typ, name) -> StringMap.add name formal map
+		  Formal(typ, name) -> StringMap.add name formal map
 		| _ -> map
 	in
 	let parameters = List.fold_left
@@ -258,6 +268,7 @@ let get_sfdecl_from_fdecl reserved fdecl =
 		env_ret_typ = fdecl.return_typ;
 		env_reserved = reserved;
 	} in
+	(* NOTE: tmp_env unused for now *)
     let func_sbody, tmp_env = get_sstmtl env fdecl.body
     in
     {
@@ -269,32 +280,36 @@ let get_sfdecl_from_fdecl reserved fdecl =
 
 (* TODO: Things start screaming around here *)
 (* Helper method to extract sfdecls from fdecls within classes. *)
-let get_class_fdecls class_maps = 
+let get_class_sfdecls reserved class_maps = 
     (* First use StringMap.fold to extract class decls from class_maps *)
-    let class_fdecls = StringMap.fold (
-        fun cname c l -> 
+    let class_sfdecls = StringMap.fold (
+        fun _ cmap lst -> 
             (* Then extract fdecls within each cdecl and convert to sfdecl. *)
-            let get_class_fnames result = StringMap.fold (
-                fun fname f l -> (get_sfdecl_from_fdecl f)::l
-            ) c.class_methods result
+            let get_class_fnames = StringMap.fold
+				(fun _ method_decl _ -> 
+					let sfdecl = get_sfdecl_from_fdecl reserved method_decl
+					in
+					sfdecl :: lst)
+				cmap.class_methods lst
             in
-            get_class_fnames l
+            get_class_fnames
     ) class_maps []
     in
-    class_fdecls
+    class_sfdecls
 
 
 (* Overview function to generate sast. We perform main checks here. *)
 let get_sast class_maps global_func_maps reserved cdecls fdecls  =
     let find_main f = match f.sfname with 
-        "main" -> true
+          "main" -> true
         | _ -> false
     in
     let check_main functions = 
         let global_main_decls = List.find_all find_main functions
         in
-        let class_main_decls = List.find_all find_main 
-            (get_class_fdecls class_maps)
+		let class_sfdecls = get_class_sfdecls reserved class_maps
+		in
+        let class_main_decls = List.find_all find_main class_sfdecls
         in
         if ((List.length global_main_decls + List.length class_main_decls) < 1 ) then
             raise (Failure("Main not defined."))
@@ -302,7 +317,7 @@ let get_sast class_maps global_func_maps reserved cdecls fdecls  =
             raise (Failure("More than 1 main function defined."))
     in 
     let get_sfdecls l f =
-        let sfdecl = get_sfdecl_from_fdecl f in sfdecl::l
+        let sfdecl = (get_sfdecl_from_fdecl reserved f) in sfdecl :: l
     in
     let global_sfdecls = List.fold_left get_sfdecls [] fdecls
     in
