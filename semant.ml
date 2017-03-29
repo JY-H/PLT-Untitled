@@ -282,7 +282,7 @@ and check_func_call env fname el =
 		else
 			raise(Failure("Incorrect type passed to function")) 
 			in
-	let handle_params (formals) params =
+	let handle_params formals params =
 		(* Should do some formal/param pattern matching later *)
 		(* Otherwise currently a simple length check *)
 		let len1 = List.length formals in

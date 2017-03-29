@@ -47,11 +47,11 @@ let rec get_llvm_type = function
 	| A.String -> str_t
 	(* TODO: Add tuple/list types *)
 	| A.Obj(name) -> L.pointer_type(find_global_class name)
-	| _ -> raise (Failure ("Type not yet supported."))
+	| _ -> raise(Failure("Type not yet supported."))
 
 and find_global_class name =
 	try Hash.find global_classes name
-	with | Not_found -> raise(Failure ("Invalid class name."))	 
+	with Not_found -> raise(Failure("Invalid class name."))	 
 
 (* Truthfully wtf am I doing I'm a monkey *)
 let rec id_gen llbuilder id is_deref =
@@ -75,7 +75,7 @@ let rec id_gen llbuilder id is_deref =
 			raise(Failure("Unknown variable " ^ id))
 
 and func_lookup fname = match (L.lookup_function fname codegen_module) with
-	  None -> raise (Failure(" function " ^ fname ^ " does not exit."))
+	  None -> raise(Failure(" function " ^ fname ^ " does not exist."))
 	| Some func -> func 
 
 and string_gen llbuilder s =
@@ -89,15 +89,15 @@ and sstmt_gen llbuilder = function
 	  SBlock st -> List.hd(List.map (sstmt_gen llbuilder) st)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
 	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
-		sexpr_gen llbuilder (SId(id, typ))
-	| _ -> raise (Failure ("Unknown statement reached."))
+		assign_gen llbuilder (SId(id, typ)) sexpr typ
+	| _ -> raise(Failure("Unknown statement reached."))
 
 and sexpr_gen llbuilder = function
 	  SIntLit(i) -> L.const_int i32_t i
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
 	| SFloatLit(f) -> L.const_float f_t f
 	| SStringLit(s) -> string_gen llbuilder s
-	| SId(id, typ) -> print_string id; id_gen llbuilder id true
+	| SId(id, typ) -> id_gen llbuilder id true
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
 	| SUnop(op, sexpr, typ) ->
@@ -106,7 +106,7 @@ and sexpr_gen llbuilder = function
 	| SCall("print", sexpr_list, typ) -> call_gen llbuilder "printf" sexpr_list
 		A.Void
 	| SNoexpr -> L.const_int i32_t 0
-	| _ -> raise (Failure ("Expression type not recognized.")) 
+	| _ -> raise(Failure("Expression type not recognized.")) 
 
 and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	let lexpr1 = sexpr_gen llbuilder sexpr1 in
@@ -204,7 +204,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 and call_gen llbuilder func_name sexpr_list stype =
 	match func_name with
 	  "printf" -> print_gen llbuilder sexpr_list
-	| _ -> raise (Failure ("CALL_GEN -- Not yet supported, go write it yourself."))
+	| _ -> raise(Failure("CALL_GEN -- Not yet supported, go write it yourself."))
 
 
 (* Helper method to generate printf function for strings. *)
@@ -217,11 +217,9 @@ and print_gen llbuilder sexpr_list =
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id =
-	let noop, ltyp = match typ with
-	  Obj(classname) -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
-	  "noop" llbuilder), find_global_class classname
-	| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0) "noop"
-		llbuilder), get_llvm_type typ
+	let ltyp = match typ with
+	  Obj(classname) -> find_global_class classname
+	| _ -> get_llvm_type typ
 	in
 
 	let alloc = L.build_alloca ltyp id llbuilder in
