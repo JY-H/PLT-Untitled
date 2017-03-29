@@ -54,14 +54,15 @@ and find_global_class name =
 	with | Not_found -> raise(Failure ("Invalid class name."))	 
 
 (* Truthfully wtf am I doing I'm a monkey *)
-let rec id_gen llbuilder id typ is_deref =
+let rec id_gen llbuilder id is_deref =
 	if is_deref then
 		try
-			Hash.find local_params id
+			let _val = Hash.find local_params id in
+			L.build_load _val id llbuilder
 		with Not_found ->
 		try
-			let new_val = Hash.find local_values id in
-			L.build_load new_val id llbuilder
+			let _val = Hash.find local_values id in
+			L.build_load _val id llbuilder
 		with Not_found ->
 			raise(Failure("Unknown variable " ^ id))
 	else
@@ -86,9 +87,9 @@ and string_gen llbuilder s =
  *)
 and sstmt_gen llbuilder = function
 	  SBlock st -> List.hd(List.map (sstmt_gen llbuilder) st)
-	| SExpr(sexpr,t) -> sexpr_gen llbuilder sexpr
-	| SLocalVar(typ, id, sexpr) -> local_var_gen llbuilder typ id (* TODO: add
-	logic to do assignment, probably create a separate assignment function *)
+	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
+	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
+		sexpr_gen llbuilder (SId(id, typ))
 	| _ -> raise (Failure ("Unknown statement reached."))
 
 and sexpr_gen llbuilder = function
@@ -96,6 +97,7 @@ and sexpr_gen llbuilder = function
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
 	| SFloatLit(f) -> L.const_float f_t f
 	| SStringLit(s) -> string_gen llbuilder s
+	| SId(id, typ) -> print_string id; id_gen llbuilder id true
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
 	| SUnop(op, sexpr, typ) ->
@@ -170,7 +172,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	let rhs_typ = get_type_from_sexpr sexpr2 in
 
 	let lhs, is_obj_access = match sexpr1 with
-		  SId(id, typ) -> id_gen llbuilder id typ false, false
+		  SId(id, typ) -> id_gen llbuilder id false, false
 		(* TODO: add functionality  for objects, tuples, etc. *)
 		(*| SFieldAccess(id, field, typ)) -> *)
 		| _ -> raise(Failure("Unable to assign."))
@@ -178,8 +180,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let rhs = match sexpr2 with
 		  SId(id, typ) -> (match typ with
-			  Obj(classname) -> id_gen llbuilder id typ false
-			| _ -> id_gen llbuilder id typ true)
+			  Obj(classname) -> id_gen llbuilder id false
+			| _ -> id_gen llbuilder id true)
 		(* TODO: implement when field access allowed *)
 		(*| SFieldAccess(id, field, typ) ->*)
 		| _ -> sexpr_gen llbuilder sexpr2
@@ -191,12 +193,6 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 				rhs
 			else
 				L.build_load rhs "tmp" llbuilder
-		| _ -> rhs
-	in
-
-	let rhs = match typ, rhs_typ with
-		  Char, Char -> L.build_uitofp rhs i8_t "tmp" llbuilder
-		| Int, Int -> L.build_uitofp rhs i32_t "tmp" llbuilder
 		| _ -> rhs
 	in
 

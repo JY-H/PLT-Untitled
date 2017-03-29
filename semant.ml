@@ -99,12 +99,12 @@ let get_class_maps cdecls reserved_map =
 	let map_class map cdecl =
 		(* Map all fields, const and non-const. *)
 		let map_fields map = function
-			  ObjVar(typ, name, e) as field ->
+			  ObjVar(_, name, _) as field ->
 				if (StringMap.mem name map) then
 					raise (Failure(" duplicate field name: " ^ name))
 				else
 					StringMap.add name field map
-			| ObjConst(typ, name, e) as const_field ->
+			| ObjConst(_, name, _) as const_field ->
 				if (StringMap.mem name map) then
 					raise (Failure(" duplicate const field name: " ^ name))
 				else
@@ -221,6 +221,7 @@ and check_equality_op sexpr1 sexpr2 op typ1 typ2 = match op with
 		| _ -> raise(Failure("Referential equality/inequality operators " ^
 			"cannot be used for types " ^
 			string_of_typ typ1 ^ " and " ^ string_of_typ typ2)))
+	| _ -> raise(Failure("Equality operation not supported"))
 
 (* Check a logical operation is valid *)
 and check_logical_op sexpr1 sexpr2 op typ1 typ2 = match typ1, typ2 with
@@ -413,8 +414,7 @@ and get_sstmtl env stmtl =
 
 let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	let get_params_map map formal = match formal with
-		  Formal(typ, name) -> StringMap.add name formal map
-		| _ -> map
+		  Formal(_, name) -> StringMap.add name formal map
 	in
 	let parameters = List.fold_left
 		get_params_map StringMap.empty (fdecl.formals) in
@@ -427,7 +427,7 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 		env_class_maps = class_maps;
 	} in
 	(* NOTE: tmp_env unused for now *)
-	let func_sbody, tmp_env = get_sstmtl env fdecl.body
+	let func_sbody, _ = get_sstmtl env fdecl.body
 	in
 	{
 		stype = fdecl.return_typ;
