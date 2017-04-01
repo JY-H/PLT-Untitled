@@ -302,6 +302,37 @@ and check_func_call env fname el =
 	with | Not_found ->
 		raise (Failure("Function " ^ fname ^ " not found."))
 
+(* Currently only casts primitives, and RHS must be a literal *)
+and check_cast env typ expr =
+	let sexpr, _ = get_sexpr env expr in
+	let s_typ = get_type_from_sexpr sexpr in
+	if (typ == Bool) then (
+		if (s_typ == Int) then (
+			if (int_of_string (string_of_expr expr) > 0)
+				then SBoolLit(true), env
+			else SBoolLit(false), env
+		) else if (s_typ == Float) then (
+			if (float_of_string (string_of_expr expr) > 0.0)
+				then SBoolLit(true), env
+			else SBoolLit(false), env
+		) else raise(Failure("Cannot cast " ^ string_of_typ s_typ ^ " to bool"))
+	) else if (typ == Int) then (
+		if (s_typ == Float) then (
+			let f = float_of_string (string_of_expr expr) in
+			SIntLit(int_of_float f), env
+		) else if (s_typ == Bool) then (
+			if (string_of_expr expr == "true") then SIntLit(1), env
+			else SIntLit(0), env
+		) else raise(Failure("Cannot cast " ^ string_of_typ s_typ ^ " to int"))
+	) else if (typ == Float) then (
+		if (s_typ == Int) then (
+			let i = int_of_string (string_of_expr expr) in
+			SFloatLit(float_of_int i), env
+		) else raise(Failure("Cannot cast " ^ string_of_typ s_typ ^ " to float"))
+	) else if (typ == String) then (
+		SStringLit(string_of_expr expr), env
+	) else raise(Failure("No cast exists for " ^ string_of_typ s_typ ^ " to " ^ string_of_typ typ))
+
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
 	| BoolLit(b) -> SBoolLit(b), env
@@ -313,8 +344,8 @@ and get_sexpr env expr = match expr with
 	| Binop(e1, op, e2) ->	check_binop env e1 op e2
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
-	(*| Cast(t, e) -> check_cast t e
-	| FieldAccess(e, s) -> check_field_access e s
+	| Cast(t, e) -> check_cast env t e
+(*	| FieldAccess(e, s) -> check_field_access e s
 	| MethodCall*)
 	| FuncCall(str, el) -> check_func_call env str el
 (*			  | ObjCreate*)
