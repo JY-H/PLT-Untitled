@@ -41,27 +41,6 @@ let add_empty_block env block_str = {
 	env_blocks = (block_str, StringMap.empty) :: env.env_blocks;
 }
 
-(* Removes all blocks to the outermost loop in the stack *)
-(*let remove_loop_block env = {
-	env_name = env.env_name;
-	env_locals = env.env_locals;
-	env_params = env.env_params;
-	env_ret_typ = env.env_ret_typ;
-	env_reserved = env.env_reserved;
-	env_class_maps = env.env_class_maps;
-	env_blocks =
-		let remove_blocks blocks = match blocks with
-		  [] -> raise(Failure("No loop blocks found"))
-		| head :: tail ->
-			let block_str, map = head in
-			if block_str = "for" || block_str = "while" then
-				tail
-			else
-				remove_blocks tail
-		in
-		remove_blocks env.env_blocks
-}*)
-
 let update_env_class_maps env class_maps = {
 	env_name = env.env_name;
 	env_locals = env.env_locals;
@@ -407,19 +386,31 @@ and get_sexpr env expr = match expr with
 
 (* Looks up the type of a variable/constant *)
 and get_id_typ env id =
-	(* Search local declarations *)
-	try
+	(* Search block declarations *)
+	let rec find_block_id id blocks = match blocks with
+		  [] -> Void
+		| head :: tail ->
+			let _, map = head in
+			if StringMap.mem id map then
+				StringMap.find id map
+			else
+				find_block_id id tail
+	in
+	let block_typ = find_block_id id env.env_blocks in
+	if block_typ != Void then
+		block_typ
+	else if StringMap.mem id env.env_locals then
+		(* Found in function local declarations *)
 		StringMap.find id env.env_locals
-	with Not_found ->
-	(* Search parameters *)
-	try
+	else if StringMap.mem id env.env_params then
+		(* Found in function parameters *)
 		let param = StringMap.find id env.env_params in
 		(function Formal(typ, _) -> typ) param
+	else
 	(* Note: I don't check object fields because I assume you'll put self before
 	 the field name, i.e. self.field if you want to access the field.
 	 Additionally, to make "self" work we'll need to add some stuff to env to
 	 keep track of the current class scope, which can get messy *)
-	with Not_found ->
 		raise(Failure("Unknown identifier: " ^ id))
 
 let rec check_block env stmtl = match stmtl with
@@ -489,6 +480,7 @@ and check_while env expr stmts =
 			" expression"))
 
 and check_break env =
+	(* Check break is in a loop body *)
 	let rec find_loop blocks = match blocks with
 		  [] -> false
 		| head :: tail ->
@@ -499,11 +491,12 @@ and check_break env =
 				find_loop tail
 	in
 	if find_loop env.env_blocks then
-		SBreak, (*remove_loop_block*) env
+		SBreak, env
 	else
 		raise(Failure("Break can only be used within a loop"))
 
 and check_continue env =
+	(* Check continue is in a loop body *)
 	let rec find_loop blocks = match blocks with
 		  [] -> false
 		| head :: tail ->
