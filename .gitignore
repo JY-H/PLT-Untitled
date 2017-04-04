@@ -23,3 +23,4 @@ setup.log
 *.ll
 *.s
 *.out
+*.log

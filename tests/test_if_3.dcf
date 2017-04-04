@@ -1,0 +1,14 @@
+main() -> int {
+	if (true) {
+		if (false) {
+			print("foo");
+		}
+		elseif (true) {
+			print("bar");
+		}
+		print("bat");
+	}
+	elseif (true) {
+		print("baz");
+	}
+}
