@@ -223,17 +223,19 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 	let if_lexpr = sexpr_gen llbuilder if_sexpr in
 
 	(* Initial bb *)
-	let if_start_bb = L.insertion_block llbuilder in
-	let parent_func = L.block_parent if_start_bb in
+	let start_bb = L.insertion_block llbuilder in
+	let parent_func = L.block_parent start_bb in
 
+	(* prepare your butt *)
+	let if_bb = L.append_block context "if" parent_func in
 	(* if bb *)
-	let if_bb = L.append_block context "then" parent_func in
+	let if_body_bb = L.append_block context "if_body" parent_func in
 
 	(* Create if bb statements *)
-	L.position_at_end if_bb llbuilder;
+	L.position_at_end if_body_bb llbuilder;
 	ignore(sstmt_gen llbuilder if_sstmts);
 
-	let new_if_bb = L.insertion_block llbuilder in
+	let new_if_body_bb = L.insertion_block llbuilder in
 
 	(* elseif bbs *)
 	let rec make_elseif_bbs elseifs = match elseifs with
@@ -248,53 +250,58 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 			(* elseif expr *)
 			let elseif_lexpr = sexpr_gen llbuilder elseif_sexpr in
 
-			let elseif_start_bb = L.insertion_block llbuilder in
-
 			(* elseif bb *)
 			let elseif_bb = L.append_block context "elseif" parent_func in
-			L.position_at_end elseif_bb llbuilder;
+			let elseif_body_bb = L.append_block context "elseif_body"
+				parent_func in
 
 			(* Create elseif bb statements *)
+			L.position_at_end elseif_body_bb llbuilder;
 			ignore(sstmt_gen llbuilder elseif_sstmts);
+
 			let new_elseif_bb = L.insertion_block llbuilder in
-			(elseif_lexpr, elseif_start_bb, elseif_bb, new_elseif_bb) :: 
+			(elseif_lexpr, elseif_bb, elseif_body_bb, new_elseif_bb) :: 
 				make_elseif_bbs tail
 	in
 	let elseif_bbs = make_elseif_bbs elseifs in
-	let if_elseif_bbs = (if_lexpr, if_start_bb, if_bb, new_if_bb) ::
-	elseif_bbs in
+	let if_elseif_bbs = (if_lexpr, if_bb, if_body_bb, new_if_body_bb) ::
+		elseif_bbs in
 	
 	(* else bb *)
-	let else_bb = L.append_block context "else" parent_func in
+	let else_body_bb = L.append_block context "else_body" parent_func in
 
 	(* Create else bb statements *)
-	L.position_at_end else_bb llbuilder;
+	L.position_at_end else_body_bb llbuilder;
 	ignore(sstmt_gen llbuilder else_sstmts);
 
-	let new_else_bb = L.insertion_block llbuilder in
+	let new_else_body_bb = L.insertion_block llbuilder in
 
 	(* Merge if-elseif-else bbs *)
 	let merge_bb = L.append_block context "merge" parent_func in
 	L.position_at_end merge_bb llbuilder;
 
 	(* else bb -> else llvalue *)
-	let else_bb_val = L.value_of_block new_else_bb in
+	let else_bb_val = L.value_of_block new_else_body_bb in
+
+	(* Initial bb -> if bb *)
+	L.position_at_end start_bb llbuilder;
+	ignore(L.build_br if_bb llbuilder);
 
 	(* Go to start bb and add conditional branch to next conditional block *)
 	let rec build_cond_brs if_elseif_bbs = match if_elseif_bbs with
 		  head :: next :: tail ->
-			let head_lexpr, head_start_bb, head_bb, _ = head in
-			let _, next_start_bb, next_bb, _ = next in
+			let head_lexpr, head_bb, head_body_bb, _ = head in
+			let _, next_bb, next_body_bb, _ = next in
 
-			L.position_at_end head_start_bb llbuilder;
-			ignore(L.build_cond_br head_lexpr head_bb next_start_bb llbuilder);
+			L.position_at_end head_bb llbuilder;
+			ignore(L.build_cond_br head_lexpr head_body_bb next_bb llbuilder);
 
 			build_cond_brs (next :: tail)
 		| head :: tail ->
-			let head_lexpr, head_start_bb, head_bb, _ = head in
+			let head_lexpr, head_bb, head_body_bb, _ = head in
 
-			L.position_at_end head_start_bb llbuilder;
-			ignore(L.build_cond_br head_lexpr head_bb else_bb llbuilder)
+			L.position_at_end head_bb llbuilder;
+			ignore(L.build_cond_br head_lexpr head_body_bb else_body_bb llbuilder)
 		| [] -> ()
 	in
 	build_cond_brs if_elseif_bbs;
@@ -304,7 +311,7 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 	(* Create merge bb at end of if bb *)
 	let rec build_merge_brs if_elseif_bbs = match if_elseif_bbs with
 		  head :: tail ->
-			let head_lexpr, _, head_bb, new_head_bb = head in
+			let _, _, _, new_head_bb = head in
 
 			L.position_at_end new_head_bb llbuilder;
 			ignore(L.build_br merge_bb llbuilder);
@@ -318,8 +325,8 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 	(*ignore (L.build_br merge_bb llbuilder);*)
 
 	(* Create merge bb at end of else bb *)
-	L.position_at_end new_else_bb llbuilder;
-	ignore (L.build_br merge_bb llbuilder);
+	L.position_at_end new_else_body_bb llbuilder;
+	ignore(L.build_br merge_bb llbuilder);
 
 	(* Go to end of merge *)
 	L.position_at_end merge_bb llbuilder;

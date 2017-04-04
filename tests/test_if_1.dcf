@@ -1,0 +1,17 @@
+main() -> int {
+	// Damn I'm so good at writing these test cases
+	int x;
+
+	if (false) {
+		print("foo");
+	}
+	elseif (true) {
+		print("bar");
+	}
+	elseif (false) {
+		print("bat");
+	}
+	else {
+		print("baz");
+	}
+}
