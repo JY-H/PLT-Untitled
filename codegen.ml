@@ -88,6 +88,8 @@ and string_gen llbuilder s =
 and sstmt_gen llbuilder = function
 	  SBlock st -> List.hd(List.map (sstmt_gen llbuilder) st)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
+	| SIf(if_expr, if_stmts, elseifs, else_stmts) ->
+		if_gen llbuilder if_expr if_stmts elseifs else_stmts
 	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
 		assign_gen llbuilder (SId(id, typ)) sexpr typ
 	| _ -> raise(Failure("Unknown statement reached."))
@@ -214,6 +216,115 @@ and print_gen llbuilder sexpr_list =
 	L.build_call (func_lookup "printf") 
 		(Array.of_list ((sexpr_gen llbuilder (SStringLit("%s")))::params))
 		"printf" llbuilder
+
+(* prepare your butt *)
+and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
+	(* if expr *)
+	let if_lexpr = sexpr_gen llbuilder if_sexpr in
+
+	(* Initial bb *)
+	let if_start_bb = L.insertion_block llbuilder in
+	let parent_func = L.block_parent if_start_bb in
+
+	(* if bb *)
+	let if_bb = L.append_block context "then" parent_func in
+
+	(* Create if bb statements *)
+	L.position_at_end if_bb llbuilder;
+	ignore(sstmt_gen llbuilder if_sstmts);
+
+	let new_if_bb = L.insertion_block llbuilder in
+
+	(* elseif bbs *)
+	let rec make_elseif_bbs elseifs = match elseifs with
+		  [] -> []
+		| head :: tail ->
+			let selseif = match head with
+				  SElseif(sexpr, sstmt) -> (sexpr, sstmt)
+				| _ -> raise(Failure("Unexpected non-elseif in elseif list"))
+			in
+			let elseif_sexpr, elseif_sstmts = selseif in
+
+			(* elseif expr *)
+			let elseif_lexpr = sexpr_gen llbuilder elseif_sexpr in
+
+			let elseif_start_bb = L.insertion_block llbuilder in
+
+			(* elseif bb *)
+			let elseif_bb = L.append_block context "elseif" parent_func in
+			L.position_at_end elseif_bb llbuilder;
+
+			(* Create elseif bb statements *)
+			ignore(sstmt_gen llbuilder elseif_sstmts);
+			let new_elseif_bb = L.insertion_block llbuilder in
+			(elseif_lexpr, elseif_start_bb, elseif_bb, new_elseif_bb) :: 
+				make_elseif_bbs tail
+	in
+	let elseif_bbs = make_elseif_bbs elseifs in
+	let if_elseif_bbs = (if_lexpr, if_start_bb, if_bb, new_if_bb) ::
+	elseif_bbs in
+	
+	(* else bb *)
+	let else_bb = L.append_block context "else" parent_func in
+
+	(* Create else bb statements *)
+	L.position_at_end else_bb llbuilder;
+	ignore(sstmt_gen llbuilder else_sstmts);
+
+	let new_else_bb = L.insertion_block llbuilder in
+
+	(* Merge if-elseif-else bbs *)
+	let merge_bb = L.append_block context "merge" parent_func in
+	L.position_at_end merge_bb llbuilder;
+
+	(* else bb -> else llvalue *)
+	let else_bb_val = L.value_of_block new_else_bb in
+
+	(* Go to start bb and add conditional branch to next conditional block *)
+	let rec build_cond_brs if_elseif_bbs = match if_elseif_bbs with
+		  head :: next :: tail ->
+			let head_lexpr, head_start_bb, head_bb, _ = head in
+			let _, next_start_bb, next_bb, _ = next in
+
+			L.position_at_end head_start_bb llbuilder;
+			ignore(L.build_cond_br head_lexpr head_bb next_start_bb llbuilder);
+
+			build_cond_brs (next :: tail)
+		| head :: tail ->
+			let head_lexpr, head_start_bb, head_bb, _ = head in
+
+			L.position_at_end head_start_bb llbuilder;
+			ignore(L.build_cond_br head_lexpr head_bb else_bb llbuilder)
+		| [] -> ()
+	in
+	build_cond_brs if_elseif_bbs;
+	(*L.position_at_end start_bb llbuilder;*)
+	(*ignore (L.build_cond_br if_lexpr if_bb else_bb llbuilder);*)
+
+	(* Create merge bb at end of if bb *)
+	let rec build_merge_brs if_elseif_bbs = match if_elseif_bbs with
+		  head :: tail ->
+			let head_lexpr, _, head_bb, new_head_bb = head in
+
+			L.position_at_end new_head_bb llbuilder;
+			ignore(L.build_br merge_bb llbuilder);
+
+			build_merge_brs tail
+		| [] -> ()
+	in
+	build_merge_brs if_elseif_bbs;
+
+	(*L.position_at_end new_if_bb llbuilder;*)
+	(*ignore (L.build_br merge_bb llbuilder);*)
+
+	(* Create merge bb at end of else bb *)
+	L.position_at_end new_else_bb llbuilder;
+	ignore (L.build_br merge_bb llbuilder);
+
+	(* Go to end of merge *)
+	L.position_at_end merge_bb llbuilder;
+	
+	else_bb_val
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id =
