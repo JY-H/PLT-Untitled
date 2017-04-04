@@ -235,7 +235,7 @@ and check_relational_op sexpr1 sexpr2 op typ1 typ2 = match typ1, typ2 with
 and check_equality_op sexpr1 sexpr2 op typ1 typ2 = match op with
 	  Veq | Vneq -> (match typ1, typ2 with
 		  Int, Int | Float, Float | Bool, Bool | Char, Char | String, String ->
-			SBinop(sexpr1, op, sexpr2, typ1)
+			SBinop(sexpr1, op, sexpr2, Bool)
 		| _ -> raise(Failure("Value equality/inequality operators cannot be " ^
 			"used for types " ^
 			string_of_typ typ1 ^ " and " ^ string_of_typ typ2)))
@@ -244,7 +244,7 @@ and check_equality_op sexpr1 sexpr2 op typ1 typ2 = match op with
 			be replaced*)
 		  Obj(classname1), Obj(classname2) ->
 			if classname1 = classname2 then
-				SBinop(sexpr1, op, sexpr2, typ1)
+				SBinop(sexpr1, op, sexpr2, Bool)
 			else
 				raise(Failure("Unmatching class types used in referential " ^
 				"equality/inequality operation"))

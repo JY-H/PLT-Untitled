@@ -85,11 +85,14 @@ and string_gen llbuilder s =
  * Additionally, this isn't the full case coverage, so we need to add that as
  * well.
  *)
-and sstmt_gen llbuilder = function
-	  SBlock st -> List.hd(List.map (sstmt_gen llbuilder) st)
+and sstmt_gen llbuilder (*loop_stack*) = function
+	(* NOTE: this requires a function body to be non-empty, is this ok? *)
+	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder (*loop_stack*)) stmts)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
 	| SIf(if_expr, if_stmts, elseifs, else_stmts) ->
-		if_gen llbuilder if_expr if_stmts elseifs else_stmts
+		if_gen llbuilder (*loop_stack*) if_expr if_stmts elseifs else_stmts
+	(*| SFor(sexpr1, sexpr2, sexpr3, sstmts) ->
+		for_gen llbuilder (*loop_stack*) sexpr1 sexpr2 sexpr3 sstmts*)
 	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
 		assign_gen llbuilder (SId(id, typ)) sexpr typ
 	| _ -> raise(Failure("Unknown statement reached."))
@@ -217,23 +220,21 @@ and print_gen llbuilder sexpr_list =
 		(Array.of_list ((sexpr_gen llbuilder (SStringLit("%s")))::params))
 		"printf" llbuilder
 
-(* prepare your butt *)
-and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
+and if_gen llbuilder (*loop_stack*) if_sexpr if_sstmts elseifs else_sstmts =
 	(* if expr *)
-	let if_lexpr = sexpr_gen llbuilder if_sexpr in
+	(*let if_lexpr = sexpr_gen llbuilder if_sexpr in*)
 
 	(* Initial bb *)
 	let start_bb = L.insertion_block llbuilder in
 	let parent_func = L.block_parent start_bb in
 
-	(* prepare your butt *)
 	let if_bb = L.append_block context "if" parent_func in
 	(* if bb *)
 	let if_body_bb = L.append_block context "if_body" parent_func in
 
 	(* Create if bb statements *)
 	L.position_at_end if_body_bb llbuilder;
-	ignore(sstmt_gen llbuilder if_sstmts);
+	ignore(sstmt_gen llbuilder (*loop_stack*) if_sstmts);
 
 	let new_if_body_bb = L.insertion_block llbuilder in
 
@@ -247,24 +248,22 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 			in
 			let elseif_sexpr, elseif_sstmts = selseif in
 
-			(* elseif expr *)
-			let elseif_lexpr = sexpr_gen llbuilder elseif_sexpr in
-
 			(* elseif bb *)
+			let bb = L.insertion_block llbuilder in
 			let elseif_bb = L.append_block context "elseif" parent_func in
 			let elseif_body_bb = L.append_block context "elseif_body"
 				parent_func in
 
 			(* Create elseif bb statements *)
 			L.position_at_end elseif_body_bb llbuilder;
-			ignore(sstmt_gen llbuilder elseif_sstmts);
+			ignore(sstmt_gen llbuilder (*loop_stack*) elseif_sstmts);
 
 			let new_elseif_bb = L.insertion_block llbuilder in
-			(elseif_lexpr, elseif_bb, elseif_body_bb, new_elseif_bb) :: 
+			(elseif_sexpr, elseif_bb, elseif_body_bb, new_elseif_bb) :: 
 				make_elseif_bbs tail
 	in
 	let elseif_bbs = make_elseif_bbs elseifs in
-	let if_elseif_bbs = (if_lexpr, if_bb, if_body_bb, new_if_body_bb) ::
+	let if_elseif_bbs = (if_sexpr, if_bb, if_body_bb, new_if_body_bb) ::
 		elseif_bbs in
 	
 	(* else bb *)
@@ -272,7 +271,7 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 
 	(* Create else bb statements *)
 	L.position_at_end else_body_bb llbuilder;
-	ignore(sstmt_gen llbuilder else_sstmts);
+	ignore(sstmt_gen llbuilder (*loop_stack*) else_sstmts);
 
 	let new_else_body_bb = L.insertion_block llbuilder in
 
@@ -290,23 +289,24 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 	(* Go to start bb and add conditional branch to next conditional block *)
 	let rec build_cond_brs if_elseif_bbs = match if_elseif_bbs with
 		  head :: next :: tail ->
-			let head_lexpr, head_bb, head_body_bb, _ = head in
+			let head_sexpr, head_bb, head_body_bb, _ = head in
 			let _, next_bb, next_body_bb, _ = next in
 
+			(* Build expr for cond br, then build cond br *)
 			L.position_at_end head_bb llbuilder;
+			let head_lexpr = sexpr_gen llbuilder head_sexpr in
 			ignore(L.build_cond_br head_lexpr head_body_bb next_bb llbuilder);
 
 			build_cond_brs (next :: tail)
 		| head :: tail ->
-			let head_lexpr, head_bb, head_body_bb, _ = head in
+			let head_sexpr, head_bb, head_body_bb, _ = head in
 
 			L.position_at_end head_bb llbuilder;
+			let head_lexpr = sexpr_gen llbuilder head_sexpr in
 			ignore(L.build_cond_br head_lexpr head_body_bb else_body_bb llbuilder)
 		| [] -> ()
 	in
 	build_cond_brs if_elseif_bbs;
-	(*L.position_at_end start_bb llbuilder;*)
-	(*ignore (L.build_cond_br if_lexpr if_bb else_bb llbuilder);*)
 
 	(* Create merge bb at end of if bb *)
 	let rec build_merge_brs if_elseif_bbs = match if_elseif_bbs with
@@ -321,9 +321,6 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 	in
 	build_merge_brs if_elseif_bbs;
 
-	(*L.position_at_end new_if_bb llbuilder;*)
-	(*ignore (L.build_br merge_bb llbuilder);*)
-
 	(* Create merge bb at end of else bb *)
 	L.position_at_end new_else_body_bb llbuilder;
 	ignore(L.build_br merge_bb llbuilder);
@@ -332,6 +329,57 @@ and if_gen llbuilder if_sexpr if_sstmts elseifs else_sstmts =
 	L.position_at_end merge_bb llbuilder;
 	
 	else_bb_val
+
+(*and for_gen llbuilder (*loop_stack*) sexpr1 sexpr2 sexpr3 sstmts =
+	(*let old_val = !is_loop in
+	is_loop := true;*)
+	
+	let parent_func = L.block_parent (L.insertion_block llbuilder) in
+
+	(* Build initialization expr *)
+	ignore(sexpr_gen llbuilder sexpr1);
+
+	(* bb's for body, step, condition, and exit *)
+	let body_bb = L.append_block context "loop_body" parent_func in
+	let step_bb = L.append_block context "loop_step" parent_func in
+	let cond_bb = L.append_block context "loop_cond" parent_func in
+	let exit_bb = L.append_block context "loop_exit" parent_func in
+
+	(*if not old_val then
+		continue_block := step_bb;
+		break_bb = exit_bb;
+	in*)
+	(*loop_stack := (step_bb, exit_bb) :: !loop_stack;*)
+
+	(* Init block -> cond *)
+	ignore(L.build_br cond_bb llbuilder);
+
+
+	(* Build body bb stmts *)
+	L.position_at_end body_bb llbuilder;
+	ignore(sstmt_gen llbuilder (*loop_stack*) sstmts);
+
+	(* Reorder blocks: bb, step, cond, exit*)
+	let bb = L.insertion_block llbuilder in
+	L.move_block_after bb step_bb;
+	L.move_block_after step_bb cond_bb;
+	L.move_block_after cond_bb exit_bb;
+	(* At exit bb, jump to step bb *)
+	ignore (L.build_br step_bb llbuilder);
+
+	(* Build conditional branch to exit bb *)
+	L.position_at_end cond_bb llbuilder;
+	let cond_lexpr = sexpr_gen llbuilder sexpr2 in
+	ignore(L.build_cond_br cond_lexpr body_bb exit_bb llbuilder);
+
+	(*is_loop := old_val;*)
+	let remove_loop stack = match stack with
+		  [] -> []
+		| head :: tail -> tail
+	in
+	(*loop_stack := remove_loop !loop_stack);*)
+
+	L.const_null i32_t*)
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id =
@@ -385,7 +433,9 @@ let func_body_gen sfdecl =
 	in
 	let _ = init_params func sfdecl.sformals
 	in
-	let _ = sstmt_gen llbuilder (SBlock(sfdecl.sbody))
+	(* Stack of control flow blocks *)
+	(*let loop_stack = ref [] in*)
+	let _ = sstmt_gen llbuilder (*loop_stack*) (SBlock(sfdecl.sbody))
 	in
 	(* TODO: Need to generalize this to fit all return types. Right now just 
 	 * int. 

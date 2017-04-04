@@ -4,6 +4,7 @@ main() -> int {
 
 	if (false) {
 		print("foo");
+		x = 1;
 	}
 	elseif (true) {
 		print("bar");
