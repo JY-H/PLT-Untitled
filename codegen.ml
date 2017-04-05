@@ -335,9 +335,6 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	else_bb_val
 
 and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
-	(*let old_val = !is_loop in
-	is_loop := true;*)
-	
 	let parent_func = L.block_parent (L.insertion_block llbuilder) in
 
 	(* Build initialization expr *)
@@ -349,11 +346,7 @@ and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
 	let cond_bb = L.append_block context "loop_cond" parent_func in
 	let exit_bb = L.append_block context "loop_exit" parent_func in
 
-	(*if not old_val then
-		continue_block := step_bb;
-		break_bb = exit_bb;
-	in*)
-	loop_stack := (step_bb, exit_bb) :: !loop_stack;
+	let new_loop_stack = (step_bb, exit_bb) :: loop_stack in
 
 	(* Init block -> cond *)
 	ignore(L.build_br cond_bb llbuilder);
@@ -378,15 +371,8 @@ and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
 
 	(* Build body bb stmts *)
 	L.position_at_end body_bb llbuilder;
-	ignore(sstmt_gen llbuilder loop_stack sstmts);
+	ignore(sstmt_gen llbuilder new_loop_stack sstmts);
 	ignore(L.build_br step_bb llbuilder);
-
-	(*is_loop := old_val;*)
-	let remove_loop stack = match stack with
-		  [] -> []
-		| head :: tail -> tail
-	in
-	loop_stack := remove_loop !loop_stack;
 
 	(*Continue building from loop exit *)
 	L.position_at_end exit_bb llbuilder;
@@ -398,14 +384,14 @@ and while_gen llbuilder loop_stack sexpr sstmts =
 
 (* Branch to nearest loop exit *)
 and break_gen llbuilder loop_stack =
-	match !loop_stack with
+	match loop_stack with
 		  head :: tail ->
 			L.build_br (snd head) llbuilder
 		| [] -> raise(Failure("Break found in non-loop"))
 
 (* Branch to nearest loop step *)
 and continue_gen llbuilder loop_stack =
-	match !loop_stack with
+	match loop_stack with
 		  head :: tail ->
 			L.build_br (fst head) llbuilder
 		| [] -> raise(Failure("Continue found in non-loop"))
@@ -462,8 +448,8 @@ let func_body_gen sfdecl =
 	in
 	let _ = init_params func sfdecl.sformals
 	in
-	(* Stack of control flow blocks *)
-	let loop_stack = ref [] in
+	(* Stack of loop blocks *)
+	let loop_stack = [] in
 	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody))
 	in
 	(* TODO: Need to generalize this to fit all return types. Right now just 
