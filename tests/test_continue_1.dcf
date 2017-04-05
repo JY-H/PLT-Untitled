@@ -1,0 +1,11 @@
+main() -> int {
+	int x;
+	while (x < 5) {
+		x = x + 1;
+		if (true) {
+			print("foo");
+			continue;
+		}
+		print("bar");
+	}
+}

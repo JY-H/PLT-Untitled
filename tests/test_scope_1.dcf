@@ -1,0 +1,7 @@
+main() -> int {
+	if (true) {
+		int i;
+	}
+
+	int i;
+}
