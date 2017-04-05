@@ -1,0 +1,11 @@
+main() -> int {
+	if (true) {
+		int i;
+
+		if (false) {
+		}
+		elseif (true) {
+			int i;
+		}
+	}
+}

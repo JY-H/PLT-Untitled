@@ -92,7 +92,7 @@ Check() {
 
     generatedfiles=""
 
-    generatedfiles="${generatedfiles} ${basename}.ll ${basename}.s ${basename} ${basename}.out" &&
+    generatedfiles="${generatedfiles} ${basename}.ll ${basename}.s ${basename} ${basename}.out ${basename}.diff" &&
     Run "${DECAF} -l" "<" $1 "| tail -n+3" ">" "${basename}.ll" &&
     Run "${LLC}" "${basename}.ll" ">" "${basename}.s" &&
     Run "${CC}" "-o" "${basename}" "${basename}.s" &&
