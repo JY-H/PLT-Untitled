@@ -7,7 +7,7 @@
 .PHONY : decaf.native
 
 decaf.native :
-	ocamlbuild -use-ocamlfind -pkgs llvm,llvm.analysis -cflags -w,+a-4 \
+	ocamlbuild -use-ocamlfind -pkgs llvm,llvm.analysis,str -cflags -w,+a-4 \
 		decaf.native
 
 # "make clean" removes all generated files

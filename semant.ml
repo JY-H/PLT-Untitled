@@ -333,35 +333,30 @@ and check_func_call env fname el =
 		raise (Failure("Function " ^ fname ^ " not found."))
 
 (* Currently only casts primitives, and RHS must be a literal *)
-and check_cast env typ expr =
+and check_cast env to_typ expr =
 	let sexpr, _ = get_sexpr env expr in
-	let s_typ = get_type_from_sexpr sexpr in
-	if (typ == Bool) then (
-		if (s_typ == Int) then (
-			if (int_of_string (string_of_expr expr) > 0)
-				then SBoolLit(true), env
-			else SBoolLit(false), env
-		) else if (s_typ == Float) then (
-			if (float_of_string (string_of_expr expr) > 0.0)
-				then SBoolLit(true), env
-			else SBoolLit(false), env
-		) else raise(Failure("Cannot cast " ^ string_of_typ s_typ ^ " to bool"))
-	) else if (typ == Int) then (
-		if (s_typ == Float) then (
-			let f = float_of_string (string_of_expr expr) in
-			SIntLit(int_of_float f), env
-		) else if (s_typ == Bool) then (
-			if (string_of_expr expr == "true") then SIntLit(1), env
-			else SIntLit(0), env
-		) else raise(Failure("Cannot cast " ^ string_of_typ s_typ ^ " to int"))
-	) else if (typ == Float) then (
-		if (s_typ == Int) then (
-			let i = int_of_string (string_of_expr expr) in
-			SFloatLit(float_of_int i), env
-		) else raise(Failure("Cannot cast " ^ string_of_typ s_typ ^ " to float"))
-	) else if (typ == String) then (
-		SStringLit(string_of_expr expr), env
-	) else raise(Failure("No cast exists for " ^ string_of_typ s_typ ^ " to " ^ string_of_typ typ))
+	let from_typ = get_type_from_sexpr sexpr in
+	(* Check cast is valid from_typ -> to_typ *)
+	let scast = match from_typ with
+		  Bool -> (match to_typ with
+			  Bool | Int | Float | String -> SCast(to_typ, sexpr)
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
+				" to " ^ string_of_typ to_typ))
+			)
+		| Int -> (match to_typ with
+			  Int | Bool | Float | String | Char -> SCast(to_typ, sexpr)
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
+				" to " ^ string_of_typ to_typ))
+			)
+		| Float -> (match to_typ with
+			  Float | Bool | Int | String  -> SCast(to_typ, sexpr)
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
+				" to " ^ string_of_typ to_typ))
+			)
+		| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ " to " ^
+			string_of_typ to_typ))
+	in
+	scast, env
 
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
