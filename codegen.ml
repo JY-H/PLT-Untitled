@@ -12,12 +12,11 @@ http://llvm.moe/ocaml/
 
 *)
 
-(* KILL_ME: kill this if unused by end of project *)
-(*open Llvm*)
+open Llvm
 open Ast
 open Sast
-(* KILL_ME: kill this if unused by end of project *)
-(*open Semant*)
+open Semant
+open Str
 
 module L = Llvm
 module A = Ast (* I would like to get rid of these (now that we opened these modules, we can directly use them anyways), but have not made any changes yet in case someone feel strongly against it *)
@@ -115,6 +114,7 @@ and sexpr_gen llbuilder = function
 	| SUnop(op, sexpr, typ) ->
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
+	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
 	| SCall("print", sexpr_list, _) -> call_gen llbuilder "printf" sexpr_list
 		A.Void
 	| SNoexpr -> L.const_int i32_t 0
@@ -180,6 +180,55 @@ and unop_gen llbuilder unop sexpr typ =
 		  Int | Float | Bool -> build_unop unop typ unop_lval
 		| _ -> raise(Failure("Invalid type for unop: " ^ string_of_typ typ))
 
+(* Forgive me father for I have janked *)
+(* string_of_llvalue returns in format <type> <value>, this functions returns
+   just <val> *)
+and string_of_lval lval =
+	let lval_str = string_of_llvalue lval in
+	let typ_str = Str.regexp "^.* " in
+	let lstr = Str.replace_first typ_str "" lval_str in
+	lstr
+
+and cast_gen llbuilder to_typ sexpr =
+	(* TODO: check this is legit *)
+	let lexpr = sexpr_gen llbuilder sexpr in 
+	let from_typ = get_type_from_sexpr sexpr in
+	match from_typ with
+		  Bool -> (match to_typ with
+			  Bool -> lexpr
+			| Int -> lexpr
+			| Float -> L.build_sitofp lexpr i32_t "bool_float_cast" llbuilder
+			| String | Char ->
+				(* NOTE: this probably doesn't work but a man can dream rite *)
+				L.build_global_stringptr (string_of_lval lexpr)
+				"bool_string_cast" llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| Int -> (match to_typ with
+			  Int -> lexpr
+			| Bool -> lexpr
+			| Float -> L.build_sitofp lexpr i32_t "int_float_cast" llbuilder
+			| String | Char ->
+				L.build_global_stringptr (string_of_lval lexpr)
+				"int_string_cast" llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| Float -> (match to_typ with
+			  Float -> lexpr
+			| Bool -> L.build_fptosi lexpr i1_t "float_bool_cast" llbuilder 
+			| Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
+			| String ->
+				L.build_global_stringptr (string_of_lval lexpr)
+				"float_string_cast" llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+			" to " ^ string_of_typ to_typ))
+	(* TODO: cast objects when objects are a thing *)
+
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
 	(* KILL_ME: kill this if unused by end of project *)
@@ -231,6 +280,7 @@ and print_gen llbuilder sexpr_list =
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	(* if expr *)
+	(* KILL_ME *)
 	(*let if_lexpr = sexpr_gen llbuilder if_sexpr in*)
 
 	(* Initial bb *)

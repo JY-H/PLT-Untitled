@@ -339,20 +339,17 @@ and check_cast env to_typ expr =
 	(* Check cast is valid from_typ -> to_typ *)
 	let scast = match from_typ with
 		  Bool -> (match to_typ with
-			  Bool -> SNoexpr
-			| Int | Float | String -> SCast(to_typ, sexpr)
+			  Bool | Int | Float | String -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
 				" to " ^ string_of_typ to_typ))
 			)
 		| Int -> (match to_typ with
-			  Int -> SNoexpr
-			| Bool | Float | String -> SCast(to_typ, sexpr)
+			  Int | Bool | Float | String | Char -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
 				" to " ^ string_of_typ to_typ))
 			)
 		| Float -> (match to_typ with
-			  Float -> SNoexpr
-			| Bool | Int | String  -> SCast(to_typ, sexpr)
+			  Float | Bool | Int | String  -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
 				" to " ^ string_of_typ to_typ))
 			)
