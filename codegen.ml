@@ -56,11 +56,6 @@ and find_global_class name =
 	with Not_found -> raise(Failure("Invalid class name."))	 
 
 let rec id_gen llbuilder id is_deref =
-	let x = match is_deref with
-		true -> "true"
-		| false -> "false"
-	in print_string x;
-
 	if is_deref then
 		try
 			let _val = Hash.find local_params id in
@@ -111,7 +106,7 @@ and sexpr_gen llbuilder = function
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
 	| SFloatLit(f) -> L.const_float f_t f
 	| SStringLit(s) -> string_gen llbuilder s
-	| SId(id, typ) -> print_int 3; id_gen llbuilder id true
+	| SId(id, typ) -> id_gen llbuilder id true
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
 	| SUnop(op, sexpr, typ) ->
@@ -186,7 +181,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	let rhs_typ = get_type_from_sexpr sexpr2 in
 
 	let lhs, is_obj_access = match sexpr1 with
-		  SId(id, typ) -> print_int 2; id_gen llbuilder id false, false
+		  SId(id, typ) -> id_gen llbuilder id false, false
 		(* TODO: add functionality  for objects, tuples, etc. *)
 		(*| SFieldAccess(id, field, typ)) -> *)
 		| _ -> raise(Failure("Unable to assign."))
@@ -194,8 +189,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let rhs = match sexpr2 with
 		  SId(id, typ) -> (match typ with
-			  Obj(classname) -> print_int 5; id_gen llbuilder id false
-			| _ -> print_int 1; id_gen llbuilder id true)
+			  Obj(classname) -> id_gen llbuilder id false
+			| _ -> id_gen llbuilder id true)
 		(* TODO: implement when field access allowed *)
 		(*| SFieldAccess(id, field, typ) ->*)
 		| _ -> sexpr_gen llbuilder sexpr2
