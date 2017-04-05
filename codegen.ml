@@ -31,6 +31,8 @@ let context = L.global_context()
 let codegen_module = L.create_module context "DECAF Codegen"
 let builder = L.builder context
 
+let global_jank_counter = 0
+
 let i1_t = L.i1_type context;;
 let i8_t = L.i8_type context;;
 let i32_t = L.i32_type context;;
@@ -95,9 +97,11 @@ and sstmt_gen llbuilder loop_stack = function
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
 	| SIf(if_sexpr, if_stmts, elseifs, else_sstmts) ->
 		if_gen llbuilder loop_stack if_sexpr if_stmts elseifs else_sstmts
-	| SWhile(sexpr, sstmts) -> while_gen llbuilder loop_stack sexpr sstmts
 	| SFor(sexpr1, sexpr2, sexpr3, sstmts) ->
 		for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts
+	| SWhile(sexpr, sstmts) -> while_gen llbuilder loop_stack sexpr sstmts
+	| SBreak -> break_gen llbuilder loop_stack
+	| SContinue -> continue_gen llbuilder loop_stack
 	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
 		assign_gen llbuilder (SId(id, typ)) sexpr typ
 	| _ -> raise(Failure("Unknown statement reached."))
@@ -335,9 +339,6 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	
 	else_bb_val
 
-and while_gen llbuilder loop_stack sexpr sstmts =
-	for_gen llbuilder loop_stack (SIntLit(0)) sexpr (SIntLit(0)) sstmts
-
 and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
 	(*let old_val = !is_loop in
 	is_loop := true;*)
@@ -362,11 +363,6 @@ and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
 	(* Init block -> cond *)
 	ignore(L.build_br cond_bb llbuilder);
 
-	(* Build body bb stmts *)
-	L.position_at_end body_bb llbuilder;
-	ignore(sstmt_gen llbuilder loop_stack sstmts);
-	ignore(L.build_br step_bb llbuilder);
-
 	(* Reorder blocks: bb, step, cond, exit*)
 	let bb = L.insertion_block llbuilder in
 	L.move_block_after bb step_bb;
@@ -385,6 +381,11 @@ and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
 	let cond_lexpr = sexpr_gen llbuilder sexpr2 in
 	ignore(L.build_cond_br cond_lexpr body_bb exit_bb llbuilder);
 
+	(* Build body bb stmts *)
+	L.position_at_end body_bb llbuilder;
+	ignore(sstmt_gen llbuilder loop_stack sstmts);
+	ignore(L.build_br step_bb llbuilder);
+
 	(*is_loop := old_val;*)
 	let remove_loop stack = match stack with
 		  [] -> []
@@ -396,6 +397,23 @@ and for_gen llbuilder loop_stack sexpr1 sexpr2 sexpr3 sstmts =
 	L.position_at_end exit_bb llbuilder;
 
 	L.const_null i32_t
+
+and while_gen llbuilder loop_stack sexpr sstmts =
+	for_gen llbuilder loop_stack (SIntLit(0)) sexpr (SIntLit(0)) sstmts
+
+(* Branch to nearest loop exit *)
+and break_gen llbuilder loop_stack =
+	match !loop_stack with
+		  head :: tail ->
+			L.build_br (snd head) llbuilder
+		| [] -> raise(Failure("Break found in non-loop"))
+
+(* Branch to nearest loop step *)
+and continue_gen llbuilder loop_stack =
+	match !loop_stack with
+		  head :: tail ->
+			L.build_br (fst head) llbuilder
+		| [] -> raise(Failure("Continue found in non-loop"))
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id =

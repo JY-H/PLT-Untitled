@@ -461,11 +461,11 @@ and check_if env if_expr if_stmts elseifs else_stmts =
 	SIf(if_sexpr, if_sstmts, selseifs, else_sstmts), env
 
 and check_for env expr1 expr2 expr3 stmts =
-	let _ = add_empty_block env "for" in
-	let sexpr1, _ = get_sexpr env expr1 in
-	let sexpr2, _ = get_sexpr env expr2 in
-	let sexpr3, _ = get_sexpr env expr3 in
-	let sstmts, _ = get_sstmt env stmts in
+	let new_env = add_empty_block env "for" in
+	let sexpr1, _ = get_sexpr new_env expr1 in
+	let sexpr2, _ = get_sexpr new_env expr2 in
+	let sexpr3, _ = get_sexpr new_env expr3 in
+	let sstmts, _ = get_sstmt new_env stmts in
 	(* TODO: do we allow vampire loops, i.e. for(;;) *)
 	SFor(sexpr1, sexpr2, sexpr3, sstmts), env
 
@@ -509,7 +509,7 @@ and check_continue env =
 	if find_loop env.env_blocks then
 		SContinue, env
 	else
-		raise(Failure("Break can only be used within a loop"))
+		raise(Failure("Continue can only be used within a loop"))
 
 
 (* Verify local var type, add to local declarations *)
@@ -580,7 +580,7 @@ and get_sstmt env stmt = match stmt with
 	| For(expr1, expr2, expr3, stmts) -> check_for env expr1 expr2 expr3 stmts
 	| While(expr, stmts) -> check_while env expr stmts
 	| Break -> check_break env
-(*	| Continue -> check_continue continue*)
+	| Continue -> check_continue env
 	| LocalVar(typ, id, expr) -> check_local_var env typ id expr
 	| LocalConst(typ, id, expr) -> check_local_const env typ id expr
 (*			  | TryCatch
