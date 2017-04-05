@@ -532,12 +532,24 @@ and check_local_var env typ id expr =
 		let sexpr, env = get_sexpr env expr in
 		(* If object type, check class name exists *)
 		match typ with
-		  Obj(classname) ->
-			if StringMap.mem classname env.env_class_maps then
-				SLocalVar(typ, id, sexpr), env
-			else
-				raise(Failure("Unknown class type: " ^ classname))
-		| _ -> SLocalVar(typ, id, sexpr), env 
+			  Obj(classname) ->
+				if StringMap.mem classname env.env_class_maps then
+					SLocalVar(typ, id, sexpr), env
+				else
+					raise(Failure("Unknown class type: " ^ classname))
+			| _ -> (match sexpr with
+				  SNoexpr -> SLocalVar(typ, id, sexpr), env
+				| _ ->
+					(* Check types match *)
+					let typ_expr = get_type_from_sexpr sexpr in
+					if typ = typ_expr then
+						SLocalVar(typ, id, sexpr), env
+					else
+						raise(Failure("Declared type of " ^ id ^
+						" and assignment type " ^ (string_of_typ) typ_expr ^
+						" do not match"))
+				)
+				
 
 (* Verify local const type and add to local declarations *)
 and check_local_const env typ id expr =

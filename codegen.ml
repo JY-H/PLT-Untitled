@@ -196,8 +196,8 @@ and cast_gen llbuilder to_typ sexpr =
 	match from_typ with
 		  Bool -> (match to_typ with
 			  Bool -> lexpr
-			| Int -> lexpr
-			| Float -> L.build_sitofp lexpr i32_t "bool_float_cast" llbuilder
+			| Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
+			| Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
 			| String | Char ->
 				(* NOTE: this probably doesn't work but a man can dream rite *)
 				L.build_global_stringptr (string_of_lval lexpr)
@@ -207,8 +207,8 @@ and cast_gen llbuilder to_typ sexpr =
 			)
 		| Int -> (match to_typ with
 			  Int -> lexpr
-			| Bool -> lexpr
-			| Float -> L.build_sitofp lexpr i32_t "int_float_cast" llbuilder
+			| Bool -> L.build_trunc lexpr i1_t "int_bool_cast" llbuilder
+			| Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
 			| String | Char ->
 				L.build_global_stringptr (string_of_lval lexpr)
 				"int_string_cast" llbuilder
@@ -217,7 +217,7 @@ and cast_gen llbuilder to_typ sexpr =
 			)
 		| Float -> (match to_typ with
 			  Float -> lexpr
-			| Bool -> L.build_fptosi lexpr i1_t "float_bool_cast" llbuilder 
+			| Bool -> L.build_fptoui lexpr i1_t "float_bool_cast" llbuilder 
 			| Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
 			| String ->
 				L.build_global_stringptr (string_of_lval lexpr)
