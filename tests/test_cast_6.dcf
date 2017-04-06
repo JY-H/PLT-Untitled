@@ -1,0 +1,25 @@
+/* More extensive testing of int -> bool conversion */
+main() -> int {
+	int i;
+	if (not <bool>i) {
+		print("yes\n");
+	}
+
+	for (i = 1; i < 10; i = i + 1) {
+		if (not <bool>i) {
+			print("no\n");
+		}
+		else {
+			print("yes\n");
+		}
+	}
+
+	for (i = -1; i > -10; i = i - 1) {
+		if (not <bool>i) {
+			print("no\n");
+		}
+		else {
+			print("yes\n");
+		}
+	}
+}
