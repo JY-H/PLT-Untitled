@@ -574,9 +574,17 @@ and check_local_const env typ id expr =
 			| _ -> add_env_block_local env id typ
 		in
 		let sexpr, env = get_sexpr env expr in
-
-		let sexpr, env = get_sexpr env expr in
-		SLocalConst(typ, id, sexpr), env
+		match sexpr with
+			  SNoexpr ->
+				SLocalConst(typ, id, sexpr), env
+			| _ ->
+				let typ_expr = get_type_from_sexpr sexpr in
+				if typ = typ_expr then
+					SLocalConst(typ, id, sexpr), env
+				else
+					raise(Failure("Declared type of " ^ id ^
+					" and assignment type " ^ (string_of_typ) typ_expr ^
+					" do not match"))
 
 and get_sstmt env stmt = match stmt with
 	  Block(blk) -> check_block env blk

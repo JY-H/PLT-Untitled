@@ -1,0 +1,15 @@
+main() -> int {
+	int i = 0;
+	
+	while (i < 5) {
+		string s = "hi\n";
+		print(s);
+		i = i + 1;
+	}
+
+	while (i < 10) {
+		string s = "bye\n";
+		print(s);
+		i = i + 1;
+	}
+}
