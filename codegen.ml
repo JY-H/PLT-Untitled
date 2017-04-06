@@ -11,10 +11,12 @@ http://llvm.moe/
 http://llvm.moe/ocaml/
 
 *)
+
 open Llvm
 open Ast
 open Sast
 open Semant
+open Str
 
 module L = Llvm
 module A = Ast (* I would like to get rid of these (now that we opened these modules, we can directly use them anyways), but have not made any changes yet in case someone feel strongly against it *)
@@ -106,13 +108,14 @@ and sexpr_gen llbuilder = function
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
 	| SFloatLit(f) -> L.const_float f_t f
 	| SStringLit(s) -> string_gen llbuilder s
-	| SId(id, typ) -> id_gen llbuilder id true
+	| SId(id, _) -> id_gen llbuilder id true
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
 	| SUnop(op, sexpr, typ) ->
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
-	| SCall("print", sexpr_list, typ) -> call_gen llbuilder "printf" sexpr_list
+	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
+	| SCall("print", sexpr_list, _) -> call_gen llbuilder "printf" sexpr_list
 		A.Void
 	| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise(Failure("Expression type not recognized.")) 
@@ -121,8 +124,9 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	let lexpr1 = sexpr_gen llbuilder sexpr1 in
 	let lexpr2 = sexpr_gen llbuilder sexpr2 in
 
-	let typ1 = get_type_from_sexpr sexpr1 in
-	let typ2 = get_type_from_sexpr sexpr2 in
+	(* KILL_ME: kill this if unused by end of project *)
+	(*let typ1 = get_type_from_sexpr sexpr1 in
+	let typ2 = get_type_from_sexpr sexpr2 in*)
 
 	let int_ops expr1 binop expr2 = match binop with
 		  Add -> L.build_add expr1 expr2 "int_addtmp" llbuilder
@@ -176,12 +180,62 @@ and unop_gen llbuilder unop sexpr typ =
 		  Int | Float | Bool -> build_unop unop typ unop_lval
 		| _ -> raise(Failure("Invalid type for unop: " ^ string_of_typ typ))
 
+(* Forgive me father for I have janked *)
+(* string_of_llvalue returns in format <type> <value>, this functions returns
+   just <val> *)
+and string_of_lval lval =
+	let lval_str = string_of_llvalue lval in
+	let typ_str = Str.regexp "^.* " in
+	let lstr = Str.replace_first typ_str "" lval_str in
+	lstr
+
+and cast_gen llbuilder to_typ sexpr =
+	(* TODO: check this is legit *)
+	let lexpr = sexpr_gen llbuilder sexpr in 
+	let from_typ = get_type_from_sexpr sexpr in
+	match from_typ with
+		  Bool -> (match to_typ with
+			  Bool -> lexpr
+			| Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
+			| Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
+			| String | Char ->
+				(* NOTE: this probably doesn't work but a man can dream rite *)
+				L.build_global_stringptr (string_of_lval lexpr)
+				"bool_string_cast" llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| Int -> (match to_typ with
+			  Int -> lexpr
+			| Bool -> L.build_trunc lexpr i1_t "int_bool_cast" llbuilder
+			| Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
+			| String | Char ->
+				L.build_global_stringptr (string_of_lval lexpr)
+				"int_string_cast" llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| Float -> (match to_typ with
+			  Float -> lexpr
+			| Bool -> L.build_fptoui lexpr i1_t "float_bool_cast" llbuilder 
+			| Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
+			| String ->
+				L.build_global_stringptr (string_of_lval lexpr)
+				"float_string_cast" llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
+			" to " ^ string_of_typ to_typ))
+	(* TODO: cast objects when objects are a thing *)
+
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
-	let rhs_typ = get_type_from_sexpr sexpr2 in
+	(* KILL_ME: kill this if unused by end of project *)
+	(*let rhs_typ = get_type_from_sexpr sexpr2 in*)
 
 	let lhs, is_obj_access = match sexpr1 with
-		  SId(id, typ) -> id_gen llbuilder id false, false
+		  SId(id, _) -> id_gen llbuilder id false, false
 		(* TODO: add functionality  for objects, tuples, etc. *)
 		(*| SFieldAccess(id, field, typ)) -> *)
 		| _ -> raise(Failure("Unable to assign."))
@@ -226,6 +280,7 @@ and print_gen llbuilder sexpr_list =
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	(* if expr *)
+	(* KILL_ME *)
 	(*let if_lexpr = sexpr_gen llbuilder if_sexpr in*)
 
 	(* Initial bb *)
@@ -253,7 +308,6 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 			let elseif_sexpr, elseif_sstmts = selseif in
 
 			(* elseif bb *)
-			let bb = L.insertion_block llbuilder in
 			let elseif_bb = L.append_block context "elseif" parent_func in
 			let elseif_body_bb = L.append_block context "elseif_body"
 				parent_func in
@@ -294,7 +348,7 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	let rec build_cond_brs if_elseif_bbs = match if_elseif_bbs with
 		  head :: next :: tail ->
 			let head_sexpr, head_bb, head_body_bb, _ = head in
-			let _, next_bb, next_body_bb, _ = next in
+			let _, next_bb, _, _ = next in
 
 			(* Build expr for cond br, then build cond br *)
 			L.position_at_end head_bb llbuilder;
@@ -302,7 +356,7 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 			ignore(L.build_cond_br head_lexpr head_body_bb next_bb llbuilder);
 
 			build_cond_brs (next :: tail)
-		| head :: tail ->
+		| head :: _ ->
 			let head_sexpr, head_bb, head_body_bb, _ = head in
 
 			L.position_at_end head_bb llbuilder;
@@ -385,14 +439,14 @@ and while_gen llbuilder loop_stack sexpr sstmts =
 (* Branch to nearest loop exit *)
 and break_gen llbuilder loop_stack =
 	match loop_stack with
-		  head :: tail ->
+		  head :: _ ->
 			L.build_br (snd head) llbuilder
 		| [] -> raise(Failure("Break found in non-loop"))
 
 (* Branch to nearest loop step *)
 and continue_gen llbuilder loop_stack =
 	match loop_stack with
-		  head :: tail ->
+		  head :: _ ->
 			L.build_br (fst head) llbuilder
 		| [] -> raise(Failure("Continue found in non-loop"))
 
