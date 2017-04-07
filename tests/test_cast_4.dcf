@@ -2,7 +2,5 @@ main() -> int {
 	bool b = <bool> true;
 	int i = <int> true;
 	float f = <float> true;
-	string s = <string> true;
-	print(s);
 	return 0;
 }

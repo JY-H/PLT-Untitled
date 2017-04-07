@@ -13,7 +13,6 @@ http://llvm.moe/ocaml/
 *)
 
 open Llvm
-open Ast
 open Sast
 open Semant
 open Str
@@ -32,8 +31,6 @@ let local_values:(string, L.llvalue) Hash.t = Hash.create 50
 let context = L.global_context()
 let codegen_module = L.create_module context "DECAF Codegen"
 let builder = L.builder context
-
-let global_jank_counter = 0
 
 let i1_t = L.i1_type context;;
 let i8_t = L.i8_type context;;
@@ -55,7 +52,7 @@ let rec get_llvm_type = function
 
 and find_global_class name =
 	try Hash.find global_classes name
-	with Not_found -> raise(Failure("Invalid class name."))	 
+	with Not_found -> raise(Failure("Invalid class name."))
 
 let rec id_gen llbuilder id is_deref =
 	if is_deref then
@@ -79,7 +76,7 @@ let rec id_gen llbuilder id is_deref =
 
 and func_lookup fname = match (L.lookup_function fname codegen_module) with
 	  None -> raise(Failure(" function " ^ fname ^ " does not exist."))
-	| Some func -> func 
+	| Some func -> func
 
 and string_gen llbuilder s =
 	L.build_global_stringptr s "tmp" llbuilder
@@ -98,12 +95,14 @@ and sstmt_gen llbuilder loop_stack = function
 	| SContinue -> continue_gen llbuilder loop_stack
 	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
 		assign_gen llbuilder (SId(id, typ)) sexpr typ
-(*      | SLocalConst *)
+	| SLocalConst(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
+		assign_gen llbuilder (SId(id, typ)) sexpr typ
 	| _ -> raise(Failure("Unknown statement reached."))
 
 and sexpr_gen llbuilder = function
 	  SIntLit(i) -> L.const_int i32_t i
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
+	| SCharLit(c) -> L.const_int i8_t (Char.code c)
 	| SFloatLit(f) -> L.const_float f_t f
 (*        | SCharList: either implement this or kill it in ast/sast*)
 	| SStringLit(s) -> string_gen llbuilder s
@@ -130,104 +129,115 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	let typ2 = get_type_from_sexpr sexpr2 in*)
 
 	let int_ops expr1 binop expr2 = match binop with
-		  Add -> L.build_add expr1 expr2 "int_addtmp" llbuilder
-		| Sub -> L.build_sub expr1 expr2 "int_subtmp" llbuilder
-		| Mult -> L.build_mul expr1 expr2 "int_multop" llbuilder
-		| Div -> L.build_sdiv expr1 expr2 "int_divop" llbuilder
-		| Mod -> L.build_srem expr1 expr2 "int_modop" llbuilder
-		| Veq -> L.build_icmp L.Icmp.Eq expr1 expr2 "int_eqtmp" llbuilder
-		| Vneq -> L.build_icmp L.Icmp.Ne expr1 expr2 "int_neqtmp" llbuilder
-		| Less -> L.build_icmp L.Icmp.Slt expr1 expr2 "int_lesstmp" llbuilder
-		| Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
-		| Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
-		| Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
+		  A.Add -> L.build_add expr1 expr2 "int_addtmp" llbuilder
+		| A.Sub -> L.build_sub expr1 expr2 "int_subtmp" llbuilder
+		| A.Mult -> L.build_mul expr1 expr2 "int_multop" llbuilder
+		| A.Div -> L.build_sdiv expr1 expr2 "int_divop" llbuilder
+		| A.Mod -> L.build_srem expr1 expr2 "int_modop" llbuilder
+		| A.Veq -> L.build_icmp L.Icmp.Eq expr1 expr2 "int_eqtmp" llbuilder
+		| A.Vneq -> L.build_icmp L.Icmp.Ne expr1 expr2 "int_neqtmp" llbuilder
+		| A.Less -> L.build_icmp L.Icmp.Slt expr1 expr2 "int_lesstmp" llbuilder
+		| A.Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
+		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
+		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
 	let float_ops expr1 binop expr2 = match binop with
-		  Add -> L.build_fadd expr1 expr2 "flt_addtmp" llbuilder
-		| Sub -> L.build_fsub expr1 expr2 "flt_subtmp" llbuilder
-		| Mult -> L.build_fmul expr1 expr2 "flt_multop" llbuilder
-		| Div -> L.build_fdiv expr1 expr2 "flt_divop" llbuilder
-		| Mod -> L.build_frem expr1 expr2 "flt_modop" llbuilder
-		| Veq -> L.build_fcmp L.Fcmp.Oeq expr1 expr2 "flt_eqtmp" llbuilder
-		| Vneq -> L.build_fcmp L.Fcmp.One expr1 expr2 "flt_neqtmp" llbuilder
-		| Less -> L.build_fcmp L.Fcmp.Ult expr1 expr2 "flt_lesstmp" llbuilder
-		| Leq -> L.build_fcmp L.Fcmp.Ole expr1 expr2 "flt_leqtmp" llbuilder
-		| Greater -> L.build_fcmp L.Fcmp.Ogt expr1 expr2 "flt_greatertmp" llbuilder
-		| Geq -> L.build_fcmp L.Fcmp.Oge expr1 expr2 "flt_geqtmp" llbuilder
+		  A.Add -> L.build_fadd expr1 expr2 "flt_addtmp" llbuilder
+		| A.Sub -> L.build_fsub expr1 expr2 "flt_subtmp" llbuilder
+		| A.Mult -> L.build_fmul expr1 expr2 "flt_multop" llbuilder
+		| A.Div -> L.build_fdiv expr1 expr2 "flt_divop" llbuilder
+		| A.Mod -> L.build_frem expr1 expr2 "flt_modop" llbuilder
+		| A.Veq -> L.build_fcmp L.Fcmp.Oeq expr1 expr2 "flt_eqtmp" llbuilder
+		| A.Vneq -> L.build_fcmp L.Fcmp.One expr1 expr2 "flt_neqtmp" llbuilder
+		| A.Less -> L.build_fcmp L.Fcmp.Olt expr1 expr2 "flt_lesstmp" llbuilder
+		| A.Leq -> L.build_fcmp L.Fcmp.Ole expr1 expr2 "flt_leqtmp" llbuilder
+		| A.Greater -> L.build_fcmp L.Fcmp.Ogt expr1 expr2 "flt_greatertmp" llbuilder
+		| A.Geq -> L.build_fcmp L.Fcmp.Oge expr1 expr2 "flt_geqtmp" llbuilder
 		| _ -> raise(Failure("Unsupported operator for floats"))
 	in
 
 	(* TODO: do something for req/rneq here *)
 	
 	match typ with
-		  Int | Bool -> int_ops lexpr1 op lexpr2
-		| Float -> float_ops lexpr1 op lexpr2
+		  A.Int | A.Bool -> int_ops lexpr1 op lexpr2
+		| A.Float -> float_ops lexpr1 op lexpr2
 		| _ -> raise(Failure("Unrecognized data type in binop"))
 
 and unop_gen llbuilder unop sexpr typ =
 	let unop_lval = sexpr_gen llbuilder sexpr in
 	
 	let build_unop op unop_typ lval = match op, unop_typ with
-		  Neg, Int -> L.build_neg lval "neg_int_tmp" llbuilder
-		| Neg, Float -> L.build_fneg lval "neg_flt_tmp" llbuilder
-		| Not, Bool -> L.build_not lval "not_bool_tmp" llbuilder
-		| _ -> raise(Failure("Unsupported unop for " ^ string_of_uop op ^ 
-			" and type " ^ string_of_typ typ))
+		  A.Neg, A.Int -> L.build_neg lval "neg_int_tmp" llbuilder
+		| A.Neg, A.Float -> L.build_fneg lval "neg_flt_tmp" llbuilder
+		| A.Not, A.Bool -> L.build_not lval "not_bool_tmp" llbuilder
+		| _ -> raise(Failure("Unsupported unop for " ^ A.string_of_uop op ^
+			" and type " ^ A.string_of_typ typ))
 	in
 
 	match typ with
-		  Int | Float | Bool -> build_unop unop typ unop_lval
-		| _ -> raise(Failure("Invalid type for unop: " ^ string_of_typ typ))
-
-(* Forgive me father for I have janked *)
-(* string_of_llvalue returns in format <type> <value>, this functions returns
-   just <val> *)
-and string_of_lval lval =
-	let lval_str = string_of_llvalue lval in
-	let typ_str = Str.regexp "^.* " in
-	let lstr = Str.replace_first typ_str "" lval_str in
-	lstr
+		  A.Int | A.Float | A.Bool -> build_unop unop typ unop_lval
+		| _ -> raise(Failure("Invalid type for unop: " ^ A.string_of_typ typ))
 
 and cast_gen llbuilder to_typ sexpr =
 	(* TODO: check this is legit *)
-	let lexpr = sexpr_gen llbuilder sexpr in 
+	let lexpr = sexpr_gen llbuilder sexpr in
 	let from_typ = get_type_from_sexpr sexpr in
 	match from_typ with
-		  Bool -> (match to_typ with
-			  Bool -> lexpr
-			| Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
-			| Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
-			| String | Char ->
-				(* NOTE: this probably doesn't work but a man can dream rite *)
-				L.build_global_stringptr (string_of_lval lexpr)
-				"bool_string_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
-				" to " ^ string_of_typ to_typ))
+		  A.Bool -> (
+			let zero = L.const_int i1_t 0 in
+			match to_typ with
+			  A.Bool -> lexpr
+			| A.Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
+			(* NOTE: questionable implementation *)
+			| A.Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
+			(* NOTE: non-working implementation unless arrays are used *)
+			(*| String ->
+				L.build_global_stringptr (A.string_of_lval lexpr)
+				"bool_string_cast" llbuilder*)
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
+				" to " ^ A.string_of_typ to_typ))
 			)
-		| Int -> (match to_typ with
-			  Int -> lexpr
-			| Bool -> L.build_trunc lexpr i1_t "int_bool_cast" llbuilder
-			| Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
-			| String | Char ->
-				L.build_global_stringptr (string_of_lval lexpr)
-				"int_string_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
-				" to " ^ string_of_typ to_typ))
+		| A.Int -> (match to_typ with
+			  A.Int -> lexpr
+			| A.Bool ->
+				let zero = L.const_int i32_t 0 in
+				L.build_icmp L.Icmp.Ne lexpr zero "int_bool_cast" llbuilder
+			| A.Char -> L.build_trunc lexpr i8_t "int_char_cast" llbuilder
+			(* NOTE: questionable implementation *)
+			| A.Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
+			(* NOTE: non-working implementation unless arrays are used *)
+			(*| String
+				L.build_global_stringptr (A.string_of_lval lexpr)
+				"int_string_cast" llbuilder*)
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
+				" to " ^ A.string_of_typ to_typ))
 			)
-		| Float -> (match to_typ with
-			  Float -> lexpr
-			| Bool -> L.build_fptoui lexpr i1_t "float_bool_cast" llbuilder 
-			| Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
-			| String ->
-				L.build_global_stringptr (string_of_lval lexpr)
-				"float_string_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
-				" to " ^ string_of_typ to_typ))
+		| A.Float -> (match to_typ with
+			  A.Float -> lexpr
+			| A.Bool ->
+				let zero = L.const_float f_t 0.0 in
+				L.build_fcmp L.Fcmp.One lexpr zero "float_bool_cast" llbuilder
+			(* NOTE: questionable implementation *)
+			| A.Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
+			(* NOTE: non-working implementation unless arrays are used *)
+			(*| A.String ->
+				L.build_global_stringptr (A.string_of_lval lexpr)
+				"float_string_cast" llbuilder*)
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
+				" to " ^ A.string_of_typ to_typ))
 			)
-		| _ -> raise(Failure("Invalid cast from " ^ string_of_typ from_typ ^
-			" to " ^ string_of_typ to_typ))
+		| A.Char -> (match to_typ with
+			  A.Char -> lexpr
+			| A.Int -> L.build_zext lexpr i32_t "char_int_cast" llbuilder
+			(* TODO: string conversion when strings exist *)
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
+				" to " ^ A.string_of_typ to_typ))
+			)
+		(* TODO; string conversion when strings exist *)
+		| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
+			" to " ^ A.string_of_typ to_typ))
 	(* TODO: cast objects when objects are a thing *)
 
 (* Assignment instruction generation *)
@@ -244,7 +254,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let rhs = match sexpr2 with
 		  SId(id, typ) -> (match typ with
-			  Obj(classname) -> id_gen llbuilder id false
+			  A.Obj(classname) -> id_gen llbuilder id false
 			| _ -> id_gen llbuilder id true)
 		(* TODO: implement when field access allowed *)
 		(*| SFieldAccess(id, field, typ) ->*)
@@ -252,7 +262,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	in
 
 	let rhs = match typ with
-		  Obj(classname) ->
+		  A.Obj(classname) ->
 			if is_obj_access then
 				rhs
 			else
@@ -327,7 +337,7 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 			ignore(sstmt_gen llbuilder loop_stack elseif_sstmts);
 
 			let new_elseif_bb = L.insertion_block llbuilder in
-			(elseif_sexpr, elseif_bb, elseif_body_bb, new_elseif_bb) :: 
+			(elseif_sexpr, elseif_bb, elseif_body_bb, new_elseif_bb) ::
 				make_elseif_bbs tail
 	in
 	let elseif_bbs = make_elseif_bbs elseifs in
@@ -463,7 +473,7 @@ and continue_gen llbuilder loop_stack =
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id =
 	let ltyp = match typ with
-	  Obj(classname) -> find_global_class classname
+	  A.Obj(classname) -> find_global_class classname
 	| _ -> get_llvm_type typ
 	in
 
@@ -493,12 +503,12 @@ let init_params func formals =
 
 let func_stub_gen sfdecl =
 	let param_types = List.rev (
-		List.fold_left 
+		List.fold_left
 			(fun x -> (function A.Formal(t, _) -> get_llvm_type t :: x))
 			[] sfdecl.sformals
-		) 
+		)
 	in
-	let stype = L.function_type (get_llvm_type sfdecl.stype) (Array.of_list param_types) 
+	let stype = L.function_type (get_llvm_type sfdecl.stype) (Array.of_list param_types)
 	in
 	L.define_function sfdecl.sfname stype codegen_module
 

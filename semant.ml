@@ -14,16 +14,19 @@ type class_map = {
 type env = {
 	env_name:		string;
 	env_locals:		typ StringMap.t;
+	env_consts:		typ StringMap.t;
 	env_params:		Ast.formal_param StringMap.t;
 	env_ret_typ:	typ;
 	env_reserved:	Sast.sfunc_decl list;
 	env_class_maps:	class_map StringMap.t;
-	env_blocks:		(string * (typ StringMap.t)) list;
+	(* Block of "block_name", local var map, and local const map *)
+	env_blocks:		(string * (typ StringMap.t) * (typ StringMap.t)) list;
 }
 
 let update_env_name env name = {
 	env_name = name;
 	env_locals = env.env_locals;
+	env_consts = env.env_consts;
 	env_params = env.env_params;
 	env_ret_typ = env.env_ret_typ;
 	env_reserved = env.env_reserved;
@@ -34,16 +37,18 @@ let update_env_name env name = {
 let add_empty_block env block_str = {
 	env_name = env.env_name;
 	env_locals = env.env_locals;
+	env_consts = env.env_consts;
 	env_params = env.env_params;
 	env_ret_typ = env.env_ret_typ;
 	env_reserved = env.env_reserved;
 	env_class_maps = env.env_class_maps;
-	env_blocks = (block_str, StringMap.empty) :: env.env_blocks;
+	env_blocks = (block_str, StringMap.empty, StringMap.empty) :: env.env_blocks;
 }
 
 let update_env_class_maps env class_maps = {
 	env_name = env.env_name;
 	env_locals = env.env_locals;
+	env_consts = env.env_consts;
 	env_params = env.env_params;
 	env_ret_typ = env.env_ret_typ;
 	env_reserved = env.env_reserved;
@@ -55,6 +60,19 @@ let update_env_class_maps env class_maps = {
 let add_env_local env id typ = {
 	env_name =env.env_name;
 	env_locals = StringMap.add id typ env.env_locals;
+	env_consts = env.env_consts;
+	env_params = env.env_params;
+	env_ret_typ = env.env_ret_typ;
+	env_reserved = env.env_reserved;
+	env_class_maps = env.env_class_maps;
+	env_blocks = env.env_blocks;
+}
+
+(* Add new const to env *)
+let add_env_const env id typ = {
+	env_name =env.env_name;
+	env_locals = env.env_locals;
+	env_consts = StringMap.add id typ env.env_consts;
 	env_params = env.env_params;
 	env_ret_typ = env.env_ret_typ;
 	env_reserved = env.env_reserved;
@@ -66,6 +84,7 @@ let add_env_local env id typ = {
 let add_env_block_local env id typ = {
 	env_name = env.env_name;
 	env_locals = env.env_locals;
+	env_consts = env.env_consts;
 	env_params = env.env_params;
 	env_ret_typ = env.env_ret_typ;
 	env_reserved = env.env_reserved;
@@ -73,10 +92,28 @@ let add_env_block_local env id typ = {
 	env_blocks = match env.env_blocks with
 		  [] -> raise(Failure("No env blocks found"))
 		| head :: tail ->
-			let block_str, map = head in
-			let new_map = StringMap.add id typ map in
-			(block_str, new_map) :: tail
+			let block_str, local_map, const_map = head in
+			let new_local_map = StringMap.add id typ local_map in
+			(block_str, new_local_map, const_map) :: tail
 }
+
+(* Add local const to current block *)
+let add_env_block_const env id typ = {
+	env_name = env.env_name;
+	env_locals = env.env_locals;
+	env_consts = env.env_consts;
+	env_params = env.env_params;
+	env_ret_typ = env.env_ret_typ;
+	env_reserved = env.env_reserved;
+	env_class_maps = env.env_class_maps;
+	env_blocks = match env.env_blocks with
+		  [] -> raise(Failure("No env blocks found"))
+		| head :: tail ->
+			let block_str, local_map, const_map = head in
+			let new_const_map = StringMap.add id typ const_map in
+			(block_str, local_map, new_const_map) :: tail
+}
+
 
 let global_func_map = StringMap.empty
 
@@ -110,8 +147,8 @@ let get_fully_qualified_name class_name fdecl = match fdecl.fname with
 
 (* Put all global function declarations into a map *)
 (* if we keep reserved_map global, can rid of the second argument*)
-let get_global_func_map fdecls reserved_map = 
-	let map_global_funcs map fdecl = 
+let get_global_func_map fdecls reserved_map =
+	let map_global_funcs map fdecl =
 		if (StringMap.mem fdecl.fname global_func_map) then
 			raise (Failure(" duplicate global function: " ^ fdecl.fname))
 		else if (StringMap.mem fdecl.fname reserved_map) then
@@ -184,7 +221,7 @@ let get_type_from_sexpr = function
 	| SCall(_, _, t) -> t
 	| SObjCreate(t, _) -> t
 	| SNoexpr -> Void
- 
+
 let rec get_sexprl env el =
 	let env_ref = ref(env) in
 	let rec helper = function
@@ -279,24 +316,23 @@ and check_unop env op expr =
 
 (* Check assignment, returns SAssign on success *)
 and check_assign env expr1 expr2 =
-	let env_ref = ref env in
-
 	let sexpr1, env  = get_sexpr env expr1 in
-	env_ref := env;
 	let sexpr2, env = get_sexpr env expr2 in
-	env_ref := env;
 
 	let typ1 = get_type_from_sexpr sexpr1 in
 	let typ2 = get_type_from_sexpr sexpr2 in
 
 	(* Only allow assignment lhs to be id or object field *)
 	match sexpr1 with
-	  SId(_, _) | SFieldAccess(_, _, _) ->
-		(* Check matching types *)
-		if typ1 = typ2 then
-			SAssign(sexpr1, sexpr2, typ2), !env_ref
+	  SId(id, _) | SFieldAccess(_, id, _) ->
+		(* Ensure id is not a const *)
+		if StringMap.mem id env.env_consts then
+			raise(Failure("Cannot assign to const id " ^ id))
+		(* Check types match *)
+		else if typ1 = typ2 then
+			SAssign(sexpr1, sexpr2, typ2), env
 		else
-			raise(Failure("Cannot assign type " ^ 
+			raise(Failure("Cannot assign type " ^
 				string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
 	(* TODO: when object access is a valid expr, ensure it is allowed as well *)
 	| _ -> raise(Failure("Invalid assignment: " ^
@@ -309,8 +345,8 @@ and check_func_call env global_func_map fname el =
 		let p_typ = get_type_from_sexpr param in
 		if (f_typ = p_typ) then param
 		else
-			raise(Failure("Incorrect type passed to function")) 
-	in
+			raise(Failure("Incorrect type passed to function"))
+			in
 	let handle_params formals params =
                 match formals, params with
                         [], [] -> []
@@ -347,17 +383,17 @@ and check_cast env to_typ expr =
 	let scast = match from_typ with
 		  Bool -> (match to_typ with
 			  Bool | Int | Float | String -> SCast(to_typ, sexpr)
-			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
 		| Int -> (match to_typ with
 			  Int | Bool | Float | String | Char -> SCast(to_typ, sexpr)
-			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
 		| Float -> (match to_typ with
 			  Float | Bool | Int | String  -> SCast(to_typ, sexpr)
-			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ 
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
 		| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ " to " ^
@@ -392,9 +428,11 @@ and get_id_typ env id =
 	let rec find_block_id id blocks = match blocks with
 		  [] -> Void
 		| head :: tail ->
-			let _, map = head in
-			if StringMap.mem id map then
-				StringMap.find id map
+			let _, local_map, const_map = head in
+			if StringMap.mem id local_map then
+				StringMap.find id local_map
+			else if StringMap.mem id const_map then
+				StringMap.find id const_map
 			else
 				find_block_id id tail
 	in
@@ -404,6 +442,9 @@ and get_id_typ env id =
 	else if StringMap.mem id env.env_locals then
 		(* Found in function local declarations *)
 		StringMap.find id env.env_locals
+	else if StringMap.mem id env.env_consts then
+		(* Found in function local declarations *)
+		StringMap.find id env.env_consts
 	else if StringMap.mem id env.env_params then
 		(* Found in function parameters *)
 		let param = StringMap.find id env.env_params in
@@ -475,7 +516,7 @@ and check_for env expr1 expr2 expr3 stmts =
 	(* TODO: do we allow vampire loops, i.e. for(;;) *)
 	SFor(sexpr1, sexpr2, sexpr3, sstmts), env
 
-and check_while env expr stmts = 
+and check_while env expr stmts =
 	let new_env = add_empty_block env "while" in
 	let sexpr, new_env = get_sexpr new_env expr in
 	let typ = get_type_from_sexpr sexpr in
@@ -490,7 +531,7 @@ and check_break env =
 	let rec find_loop blocks = match blocks with
 		  [] -> false
 		| head :: tail ->
-			let block_str, _ = head in
+			let block_str, _, _ = head in
 			if block_str = "for" || block_str = "while" then
 				true
 			else
@@ -506,7 +547,7 @@ and check_continue env =
 	let rec find_loop blocks = match blocks with
 		  [] -> false
 		| head :: tail ->
-			let block_str, _ = head in
+			let block_str, _, _ = head in
 			if block_str = "for" || block_str = "while" then
 				true
 			else
@@ -520,15 +561,15 @@ and check_continue env =
 
 (* Verify local var type, add to local declarations *)
 and check_local_var env typ id expr =
-	if StringMap.mem id env.env_locals then
+	if StringMap.mem id env.env_locals || StringMap.mem id env.env_consts then
 		raise(Failure("Duplicate local declaration: " ^ id))
 	else
 		(* Look in block stack for duplicate declaration *)
 		let rec search_block_stack id blocks = match blocks with
 			  [] -> true
 			| head :: tail ->
-				let map = snd head in
-				if StringMap.mem id map then
+				let _, local_map, const_map = head in
+				if StringMap.mem id local_map || StringMap.mem id const_map then
 					raise(Failure("Duplicate block declaration: " ^ id))
 				else
 					search_block_stack id tail
@@ -564,30 +605,39 @@ and check_local_var env typ id expr =
 
 (* Verify local const type and add to local declarations *)
 and check_local_const env typ id expr =
-	if StringMap.mem id env.env_locals then
+	if StringMap.mem id env.env_locals || StringMap.mem id env.env_consts then
 		raise(Failure("Duplicate local declaration: " ^ id))
 	else
 		(* Look in block stack for duplicate declaration *)
 		let rec search_block_stack id blocks = match blocks with
 			  [] -> true
 			| head :: tail ->
-				let map = snd head in
-				if StringMap.mem id map then
+				let _, local_map, const_map = head in
+				if StringMap.mem id local_map || StringMap.mem id const_map then
 					raise(Failure("Duplicate block declaration: " ^ id))
 				else
 					search_block_stack id tail
 		in
-		let _ = search_block_stack id env.env_blocks in
+		ignore(search_block_stack id env.env_blocks);
+
 		(* If in a block, add to local block declarations, else add to local
 		declaration stack*)
 		let env = match env.env_blocks with
-			  [] -> add_env_local env id typ
-			| _ -> add_env_block_local env id typ
+			  [] -> add_env_const env id typ
+			| _ -> add_env_block_const env id typ
 		in
 		let sexpr, env = get_sexpr env expr in
-
-		let sexpr, env = get_sexpr env expr in
-		SLocalConst(typ, id, sexpr), env
+		match sexpr with
+			  SNoexpr ->
+				SLocalConst(typ, id, sexpr), env
+			| _ ->
+				let typ_expr = get_type_from_sexpr sexpr in
+				if typ = typ_expr then
+					SLocalConst(typ, id, sexpr), env
+				else
+					raise(Failure("Declared type of " ^ id ^
+					" and assignment type " ^ (string_of_typ) typ_expr ^
+					" do not match"))
 
 and get_sstmt env stmt = match stmt with
 	  Block(blk) -> check_block env blk
@@ -602,7 +652,7 @@ and get_sstmt env stmt = match stmt with
 	| LocalVar(typ, id, expr) -> check_local_var env typ id expr
 	| LocalConst(typ, id, expr) -> check_local_const env typ id expr
 (*			  | TryCatch
-	| 
+	|
 	| Throw
 	*)
 	| _ -> raise(Failure("Idk what stmt you are talking abt"))
@@ -637,6 +687,7 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	let env = {
 		env_name = ""; (* Should be class name once classes happen *)
 		env_locals = StringMap.empty;
+		env_consts = StringMap.empty;
 		env_params = parameters;
 		env_ret_typ = fdecl.return_typ;
 		env_reserved = reserved;
@@ -655,13 +706,13 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 
 (* TODO: Things start screaming around here *)
 (* Helper method to extract sfdecls from fdecls within classes. *)
-let get_class_sfdecls reserved class_maps = 
+let get_class_sfdecls reserved class_maps =
 	(* First use StringMap.fold to extract class decls from class_maps *)
 	let class_sfdecls = StringMap.fold (
-		fun _ cmap lst -> 
+		fun _ cmap lst ->
 			(* Then extract fdecls within each cdecl and convert to sfdecl. *)
 			let get_class_fnames = StringMap.fold
-				(fun _ method_decl _ -> 
+				(fun _ method_decl _ ->
 					let sfdecl = get_sfdecl_from_fdecl class_maps reserved method_decl
 					in
 					sfdecl :: lst)
@@ -674,11 +725,11 @@ let get_class_sfdecls reserved class_maps =
 
 (* Overview function to generate sast. We perform main checks here. *)
 let get_sast class_maps global_func_maps reserved cdecls fdecls  =
-	let find_main f = match f.sfname with 
+	let find_main f = match f.sfname with
 		  "main" -> true
 		| _ -> false
 	in
-	let check_main functions = 
+	let check_main functions =
 		let global_main_decls = List.find_all find_main functions
 		in
 		let class_sfdecls = get_class_sfdecls reserved class_maps
@@ -689,7 +740,7 @@ let get_sast class_maps global_func_maps reserved cdecls fdecls  =
 			raise (Failure("Main not defined."))
 		else if ((List.length global_main_decls + List.length class_main_decls) > 1) then
 			raise (Failure("More than 1 main function defined."))
-	in 
+	in
 	let get_sfdecls l f =
 		let sfdecl = (get_sfdecl_from_fdecl class_maps reserved f) in sfdecl :: l
 	in
@@ -699,13 +750,13 @@ let get_sast class_maps global_func_maps reserved cdecls fdecls  =
 	let _ = check_main global_sfdecls
 	in
 	{
-		classes = []; 
+		classes = [];
 		functions = global_sfdecls;
-		reserved = reserved 
+		reserved = reserved
 	}
 
 let check program = match program with
-	Program(globals) ->  
+	Program(globals) ->
 		let global_func_map = get_global_func_map globals.fdecls reserved_map in
 		let class_maps = get_class_maps globals.cdecls reserved_map in
 		let sast = get_sast class_maps global_func_map reserved_list globals.cdecls globals.fdecls in
