@@ -432,7 +432,7 @@ and check_return env expr =
         match styp, env.env_ret_typ with
         (* later object type ok to be NULL *)
                 _ -> 
-                    if styp = env.env_ret_typ
+                    if env.env_ret_typ = styp
                         then SReturn(sexpr, styp), env
                         else raise(Failure("return type mismatch"))
 
@@ -617,8 +617,6 @@ and get_sstmtl env stmtl =
 		| [] -> []
 	in
 	let sstmts = (helper stmtl), !env_ref in sstmts
-	(*(get_sstmt head) :: (helper tail)
-	in helper stmtl*)
 
 (* return type is handled in check_return *)
 let check_func_has_return fname sfbody return_typ =
