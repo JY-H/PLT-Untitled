@@ -2,6 +2,4 @@ main() -> int {
 	int x = <int> 5;
 	bool b = <bool> 5;
 	float f = <float> 5;
-	string s = <string> 5;
-	print(s);
 }

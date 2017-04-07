@@ -25,10 +25,8 @@ Every pull request should come with a test case to prove that the newly implemen
 
 #### Apr.1st: get everything you can do in main (aka everything you can do in C) done
 * priority:
-* assignment, binop, unop
-* cast
-* if, elseif, elseifs
-* for, while, break, continue
+* functions/returns
+* objects
 
 #### TESTING TODOs:
 * Remember to add additional testing scripts if you implement a new functionality.
