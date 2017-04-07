@@ -11,4 +11,5 @@ main() -> int {
 	elseif (true) {
 		print("baz");
 	}
+	return 0;
 }

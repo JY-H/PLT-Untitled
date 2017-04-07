@@ -15,4 +15,5 @@ main() -> int {
 	else {
 		print("baz");
 	}
+	return 0;
 }

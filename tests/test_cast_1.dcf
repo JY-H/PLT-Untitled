@@ -1,3 +1,4 @@
 main() -> int {
 	int i = <int> 4.0;
+	return 0;
 }

@@ -4,4 +4,5 @@ main() -> int {
 	}
 
 	int i;
+	return 0;
 }

@@ -4,4 +4,5 @@ main() -> int {
 	if (true) {
 		int i = 5;
 	}
+	return -1;
 }

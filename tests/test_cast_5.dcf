@@ -4,4 +4,5 @@ main() -> int {
 	int i = <int> 5.0;
 	string s = <string> 5.0;
 	print(s);
+	return 0;
 }

@@ -7,4 +7,5 @@ main() -> int {
 	bool f = <bool> -13.23;
 	int g = <int> false;
 	int h = <int> true;
+	return 0;
 }
