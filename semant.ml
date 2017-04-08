@@ -115,7 +115,7 @@ let add_env_block_const env id typ = {
 }
 
 
-let global_func_map = StringMap.empty
+let global_func_map_ref = ref StringMap.empty
 
 let reserved_list =
 (* Helper function to get all built-in functions. *)
@@ -149,7 +149,7 @@ let get_fully_qualified_name class_name fdecl = match fdecl.fname with
 (* if we keep reserved_map global, can rid of the second argument*)
 let get_global_func_map fdecls reserved_map =
 	let map_global_funcs map fdecl =
-		if (StringMap.mem fdecl.fname global_func_map) then
+		if (StringMap.mem fdecl.fname map) then
 			raise (Failure(" duplicate global function: " ^ fdecl.fname))
 		else if (StringMap.mem fdecl.fname reserved_map) then
 			raise (Failure(fdecl.fname ^ " is a reserved function."))
@@ -338,7 +338,9 @@ and check_assign env expr1 expr2 =
 	| _ -> raise(Failure("Invalid assignment: " ^
 		string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
-and check_func_call env global_func_map fname el =
+and check_func_call env fname el =
+        let global_func_map = !global_func_map_ref
+        in
 	let sel, env = get_sexprl env el in
 	let check_param formal param =
 		let f_typ = match formal with Formal(t, _) -> t | _ -> Void in
@@ -415,7 +417,7 @@ and get_sexpr env expr = match expr with
 	| Cast(t, e) -> check_cast env t e
 (*	| FieldAccess(e, s) -> check_field_access e s
 	| MethodCall*)
-	| FuncCall(str, el) -> check_func_call env global_func_map str el
+	| FuncCall(str, el) -> check_func_call env str el
 (*			  | ObjCreate*)
 	| Self -> SId("self", Void), env (*void dummy*)
 (*			  | Super*)
@@ -724,7 +726,7 @@ let get_class_sfdecls reserved class_maps =
 	class_sfdecls
 
 (* Overview function to generate sast. We perform main checks here. *)
-let get_sast class_maps global_func_maps reserved cdecls fdecls  =
+let get_sast class_maps reserved cdecls fdecls  =
 	let find_main f = match f.sfname with
 		  "main" -> true
 		| _ -> false
@@ -757,9 +759,10 @@ let get_sast class_maps global_func_maps reserved cdecls fdecls  =
 
 let check program = match program with
 	Program(globals) ->
-		let global_func_map = get_global_func_map globals.fdecls reserved_map in
+                let global_func_map = get_global_func_map globals.fdecls reserved_map
+                in global_func_map_ref := global_func_map;
 		let class_maps = get_class_maps globals.cdecls reserved_map in
-		let sast = get_sast class_maps global_func_map reserved_list globals.cdecls globals.fdecls in
+		let sast = get_sast class_maps reserved_list globals.cdecls globals.fdecls in
 		sast
 	(* TODO: A lot of shit. But check is the main function so we need to add top
 	 * level logic here. *)

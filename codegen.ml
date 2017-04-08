@@ -56,6 +56,9 @@ and find_global_class name =
 
 let rec id_gen llbuilder id is_deref =
 	if is_deref then
+
+                (Printf.printf "id_gen %s, param table length %d\n" id (Hash.length local_params);
+
 		try
 			let _val = Hash.find local_params id in
 			L.build_load _val id llbuilder
@@ -64,7 +67,7 @@ let rec id_gen llbuilder id is_deref =
 			let _val = Hash.find local_values id in
 			L.build_load _val id llbuilder
 		with Not_found ->
-			raise(Failure("Unknown variable " ^ id))
+			raise(Failure("Unknown variable " ^ id)))
 	else
 		try
 			Hash.find local_values id
@@ -93,10 +96,8 @@ and sstmt_gen llbuilder loop_stack = function
 	| SWhile(sexpr, sstmts) -> while_gen llbuilder loop_stack sexpr sstmts
 	| SBreak -> break_gen llbuilder loop_stack
 	| SContinue -> continue_gen llbuilder loop_stack
-	| SLocalVar(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
-		assign_gen llbuilder (SId(id, typ)) sexpr typ
-	| SLocalConst(typ, id, sexpr) -> ignore(local_var_gen llbuilder typ id);
-		assign_gen llbuilder (SId(id, typ)) sexpr typ
+	| SLocalVar(typ, id, sexpr) -> local_var_gen llbuilder typ id sexpr
+	| SLocalConst(typ, id, sexpr) -> local_var_gen llbuilder typ id sexpr
 	| _ -> raise(Failure("Unknown statement reached."))
 
 and sexpr_gen llbuilder = function
@@ -106,7 +107,7 @@ and sexpr_gen llbuilder = function
 	| SFloatLit(f) -> L.const_float f_t f
 (*        | SCharList: either implement this or kill it in ast/sast*)
 	| SStringLit(s) -> string_gen llbuilder s
-	| SId(id, _) -> id_gen llbuilder id true
+        | SId(id, _) -> id_gen llbuilder id true
         | SNull -> L.const_null i32_t
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
@@ -281,7 +282,7 @@ and call_gen llbuilder fname sexprl stype =
                 let the_func = func_lookup fname in
                 let params = List.map (sexpr_gen llbuilder) sexprl in
                 match stype with
-                          Void -> L.build_call the_func (Array.of_list params) "" llbuilder
+                          A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
                         | _ -> L.build_call the_func (Array.of_list params) "tmp" llbuilder
 
 (* Helper method to generate print function for strings. *)
@@ -294,7 +295,7 @@ and print_gen llbuilder sexpr_list =
 
 and ret_gen llbuilder sexpr t =
         match sexpr with
-                  SId(name, t) -> build_ret (id_gen llbuilder name false) llbuilder
+                  SId(name, t) -> build_ret (id_gen llbuilder name true) llbuilder
                 | SNoexpr -> build_ret_void llbuilder
                 | _ -> build_ret (sexpr_gen llbuilder sexpr) llbuilder
 
@@ -471,7 +472,8 @@ and continue_gen llbuilder loop_stack =
 		| [] -> raise(Failure("Continue found in non-loop"))
 
 (* Generates a local variable declaration *)
-and local_var_gen llbuilder typ id =
+(* HH: made changes to for func parameters *)
+and local_var_gen llbuilder typ id sexpr =
 	let ltyp = match typ with
 	  A.Obj(classname) -> find_global_class classname
 	| _ -> get_llvm_type typ
@@ -479,7 +481,10 @@ and local_var_gen llbuilder typ id =
 
 	let alloc = L.build_alloca ltyp id llbuilder in
 	Hash.add local_values id alloc;
-	alloc
+        let lhs = SId(id, typ) in
+        match sexpr with
+                SNoexpr -> alloc
+                | _ -> assign_gen llbuilder lhs sexpr typ
 
 (* Declare all built-in functions. This should match the functions added in
  * semant.ml
@@ -496,9 +501,9 @@ let init_params func formals =
 	let formal_array = Array.of_list (formals) in
 	Array.iteri (fun index value ->
 		let name = formal_array.(index) in
-		let name = A.string_of_formal name in
-		L.set_value_name name value;
-		Hash.add local_params name value; ) (L.params func)
+                match name with A.Formal(t, n) ->
+		L.set_value_name n value;
+		Hash.add local_params n value; ) (L.params func)
 
 
 let func_stub_gen sfdecl =
@@ -537,8 +542,7 @@ let translate sprogram =
 	let _ = List.map (fun s -> class_stub_gen s) sprogram.classes
 	in
 	let _ = List.map (fun s -> class_gen s) sprogram.classes*)
-	in
-
+        in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions
 	in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions
