@@ -58,8 +58,8 @@ let rec id_gen llbuilder id is_deref =
 	if is_deref then
 (
 		try
-			let _val = Hash.find local_params id in
-			L.build_load _val id llbuilder
+                    (*HH: if build_load function parameters, llvm will yell at you*)
+			Hash.find local_params id
 		with Not_found ->
 		try
 			let _val = Hash.find local_values id in
@@ -139,6 +139,8 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
 		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
 		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
+                | A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
+                (*I think several others are missing, like or*)
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
@@ -470,7 +472,7 @@ and continue_gen llbuilder loop_stack =
 		| [] -> raise(Failure("Continue found in non-loop"))
 
 (* Generates a local variable declaration *)
-(* HH: made changes to for func parameters *)
+(* HH: made changes for the case of func parameters *)
 and local_var_gen llbuilder typ id sexpr =
 	let ltyp = match typ with
 	  A.Obj(classname) -> find_global_class classname
