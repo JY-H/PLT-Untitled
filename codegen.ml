@@ -56,9 +56,7 @@ and find_global_class name =
 
 let rec id_gen llbuilder id is_deref =
 	if is_deref then
-
-                (Printf.printf "id_gen %s, param table length %d\n" id (Hash.length local_params);
-
+(
 		try
 			let _val = Hash.find local_params id in
 			L.build_load _val id llbuilder
@@ -78,8 +76,8 @@ let rec id_gen llbuilder id is_deref =
 			raise(Failure("Unknown variable " ^ id))
 
 and func_lookup fname = match (L.lookup_function fname codegen_module) with
-	  None -> raise(Failure(" function " ^ fname ^ " does not exist."))
-	| Some func -> func
+          None -> raise(Failure(" function " ^ fname ^ " does not exist."))
+        | Some func -> func
 
 and string_gen llbuilder s =
 	L.build_global_stringptr s "tmp" llbuilder
@@ -289,7 +287,7 @@ and call_gen llbuilder fname sexprl stype =
 and print_gen llbuilder sexpr_list =
 	let params = List.map (fun expr -> sexpr_gen llbuilder expr) sexpr_list
 	in
-	L.build_call (func_lookup "print")
+	L.build_call (func_lookup "printf")
 		(Array.of_list ((sexpr_gen llbuilder (SStringLit("%s")))::params))
 		"print" llbuilder
 
@@ -492,9 +490,9 @@ and local_var_gen llbuilder typ id sexpr =
 let construct_library_functions =
 	let print_type = L.var_arg_function_type i32_t [| L.pointer_type i8_t |]
 	in
-	let _ = L.declare_function "print" print_type codegen_module
+	let _ = L.declare_function "printf" print_type codegen_module
 	in
-	() (* return unit *)
+	()
 
 
 let init_params func formals =
@@ -531,7 +529,7 @@ let func_body_gen sfdecl =
 	let loop_stack = [] in
 	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody))
 	in
-        if sfdecl.stype = Void then ignore(L.build_ret_void llbuilder);
+        if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
         ()
 
 
