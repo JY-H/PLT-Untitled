@@ -3,10 +3,6 @@ gcd(int a, int b) -> int {
 		return a;
 	}
 	return gcd(b, a%b);
-//	if (a===100 and b===20) {
-//		print("argument passed in correctly\n");
-//	}
-//	return 20;
 }
 
 main() -> int {

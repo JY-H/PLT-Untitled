@@ -475,7 +475,7 @@ and check_return env expr =
 	if env.env_ret_typ = styp then
 		SReturn(sexpr, styp), env
 	else
-		raise(Failure("return type mismatch"))
+		raise(Failure("Return type mismatch"))
 
 and check_if env if_expr if_stmts elseifs else_stmts =
 	let new_env = add_empty_block env "if" in

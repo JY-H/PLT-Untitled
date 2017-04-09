@@ -25,7 +25,6 @@ Every pull request should come with a test case to prove that the newly implemen
 
 #### Apr.1st: get everything you can do in main (aka everything you can do in C) done
 * priority:
-* functions/returns
 * objects
 
 #### TESTING TODOs:
