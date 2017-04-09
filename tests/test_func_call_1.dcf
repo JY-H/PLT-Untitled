@@ -8,5 +8,5 @@ main() -> int {
 	if (y === 2) {
 		print("I can do math");
 	}
-	return y;
+	return 0;
 }

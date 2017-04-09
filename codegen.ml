@@ -56,28 +56,24 @@ and find_global_class name =
 
 let rec id_gen llbuilder id is_deref =
 	if is_deref then
-(
-		try
-                    (*HH: if build_load function parameters, llvm will yell at you*)
-			Hash.find local_params id
-		with Not_found ->
-		try
+		if Hash.mem local_values id then
 			let _val = Hash.find local_values id in
 			L.build_load _val id llbuilder
-		with Not_found ->
-			raise(Failure("Unknown variable " ^ id)))
-	else
-		try
-			Hash.find local_values id
-		with Not_found ->
-		try
+		else if Hash.mem local_params id then
 			Hash.find local_params id
-		with Not_found ->
+		else
+			raise(Failure("Unknown variable " ^ id))
+	else
+		if Hash.mem local_values id then
+			Hash.find local_values id
+		else if Hash.mem local_params id then
+			Hash.find local_params id
+		else
 			raise(Failure("Unknown variable " ^ id))
 
 and func_lookup fname = match (L.lookup_function fname codegen_module) with
-          None -> raise(Failure(" function " ^ fname ^ " does not exist."))
-        | Some func -> func
+		  None -> raise(Failure(" function " ^ fname ^ " does not exist."))
+		| Some func -> func
 
 and string_gen llbuilder s =
 	L.build_global_stringptr s "tmp" llbuilder
@@ -86,7 +82,7 @@ and sstmt_gen llbuilder loop_stack = function
 	(* NOTE: this requires a function body to be non-empty, is this ok? *)
 	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder loop_stack) stmts)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
-        | SReturn(sexpr, t) -> ret_gen llbuilder sexpr t
+		| SReturn(sexpr, t) -> ret_gen llbuilder sexpr t
 	| SIf(if_sexpr, if_stmts, elseifs, else_sstmts) ->
 		if_gen llbuilder loop_stack if_sexpr if_stmts elseifs else_sstmts
 	| SFor(sexpr1, sexpr2, sexpr3, sstmts) ->
@@ -103,20 +99,19 @@ and sexpr_gen llbuilder = function
 	| SBoolLit(b) -> if b then L.const_int i1_t 1 else L.const_int i1_t 0
 	| SCharLit(c) -> L.const_int i8_t (Char.code c)
 	| SFloatLit(f) -> L.const_float f_t f
-(*        | SCharList: either implement this or kill it in ast/sast*)
 	| SStringLit(s) -> string_gen llbuilder s
-        | SId(id, _) -> id_gen llbuilder id true
-        | SNull -> L.const_null i32_t
+		| SId(id, _) -> id_gen llbuilder id true
+		| SNull -> L.const_null i32_t
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
 	| SUnop(op, sexpr, typ) ->
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
-        (* | SFieldAccess *)
+		(* | SFieldAccess *)
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
-(*      | SObjCreate *)
-        | SNoexpr -> L.const_int i32_t 0
+(*	  | SObjCreate *)
+		| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise(Failure("Expression type not recognized.")) 
 
 and binop_gen llbuilder sexpr1 op sexpr2 typ =
@@ -139,8 +134,8 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
 		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
 		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
-                | A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
-                (*I think several others are missing, like or*)
+				| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
+				(*I think several others are missing, like or*)
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
@@ -275,15 +270,15 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	rhs
 
 and call_gen llbuilder fname sexprl stype =
-        match fname with
-        (*here should be a full list of built-in and linked functions*)
-                 "print" -> print_gen llbuilder sexprl
-                | _ ->
-                let the_func = func_lookup fname in
-                let params = List.map (sexpr_gen llbuilder) sexprl in
-                match stype with
-                          A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
-                        | _ -> L.build_call the_func (Array.of_list params) "tmp" llbuilder
+		match fname with
+		(*here should be a full list of built-in and linked functions*)
+				 "print" -> print_gen llbuilder sexprl
+				| _ ->
+				let the_func = func_lookup fname in
+				let params = List.map (sexpr_gen llbuilder) sexprl in
+				match stype with
+						  A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
+						| _ -> L.build_call the_func (Array.of_list params) "tmp" llbuilder
 
 (* Helper method to generate print function for strings. *)
 and print_gen llbuilder sexpr_list =
@@ -294,10 +289,10 @@ and print_gen llbuilder sexpr_list =
 		"print" llbuilder
 
 and ret_gen llbuilder sexpr t =
-        match sexpr with
-                  SId(name, t) -> build_ret (id_gen llbuilder name true) llbuilder
-                | SNoexpr -> build_ret_void llbuilder
-                | _ -> build_ret (sexpr_gen llbuilder sexpr) llbuilder
+		match sexpr with
+				  SId(name, t) -> build_ret (id_gen llbuilder name true) llbuilder
+				| SNoexpr -> build_ret_void llbuilder
+				| _ -> build_ret (sexpr_gen llbuilder sexpr) llbuilder
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	(* if expr *)
@@ -481,10 +476,10 @@ and local_var_gen llbuilder typ id sexpr =
 
 	let alloc = L.build_alloca ltyp id llbuilder in
 	Hash.add local_values id alloc;
-        let lhs = SId(id, typ) in
-        match sexpr with
-                SNoexpr -> alloc
-                | _ -> assign_gen llbuilder lhs sexpr typ
+		let lhs = SId(id, typ) in
+		match sexpr with
+				SNoexpr -> alloc
+				| _ -> assign_gen llbuilder lhs sexpr typ
 
 (* Declare all built-in functions. This should match the functions added in
  * semant.ml
@@ -501,7 +496,7 @@ let init_params func formals =
 	let formal_array = Array.of_list (formals) in
 	Array.iteri (fun index value ->
 		let name = formal_array.(index) in
-                match name with A.Formal(t, n) ->
+				match name with A.Formal(t, n) ->
 		L.set_value_name n value;
 		Hash.add local_params n value; ) (L.params func)
 
@@ -531,8 +526,8 @@ let func_body_gen sfdecl =
 	let loop_stack = [] in
 	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody))
 	in
-        if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
-        ()
+		if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
+		()
 
 
 let translate sprogram =
@@ -542,7 +537,7 @@ let translate sprogram =
 	let _ = List.map (fun s -> class_stub_gen s) sprogram.classes
 	in
 	let _ = List.map (fun s -> class_gen s) sprogram.classes*)
-        in
+		in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions
 	in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions

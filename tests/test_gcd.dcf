@@ -1,12 +1,12 @@
 gcd(int a, int b) -> int {
-//	if (b === 0) {
-//		return a;
-//	}
-//	return gcd(b, a%b);
-	if ((a===100) and (b===20)) {
-		print("argument passed in correctly\n");
+	if (b === 0) {
+		return a;
 	}
-	return 20;
+	return gcd(b, a%b);
+//	if (a===100 and b===20) {
+//		print("argument passed in correctly\n");
+//	}
+//	return 20;
 }
 
 main() -> int {
@@ -14,7 +14,7 @@ main() -> int {
 	int b = 20;
 	int c = 49;
 	int e = 29;
-	if (gcd(a, b) === 20 /*&& gcd(c, d) === 1*/) {
+	if (gcd(a, b) === 20 and gcd(c, e) === 1) {
 		print("I can do gcd -w-\n");
 	}
 	return 0;

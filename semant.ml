@@ -339,8 +339,8 @@ and check_assign env expr1 expr2 =
 		string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
 and check_func_call env fname el =
-        let global_func_map = !global_func_map_ref
-        in
+		let global_func_map = !global_func_map_ref
+		in
 	let sel, env = get_sexprl env el in
 	let check_param formal param =
 		let f_typ = match formal with Formal(t, _) -> t | _ -> Void in
@@ -350,11 +350,11 @@ and check_func_call env fname el =
 			raise(Failure("Incorrect type passed to function"))
 			in
 	let handle_params formals params =
-                match formals, params with
-                        [], [] -> []
-                |       [], _ -> raise(Failure("Formals and actuals mismatch"))
-                |       _, [] -> raise(Failure("Cannot pass void as function params"))
-                |       _ ->
+				match formals, params with
+						[], [] -> []
+				|	   [], _ -> raise(Failure("Formals and actuals mismatch"))
+				|	   _, [] -> raise(Failure("Cannot pass void as function params"))
+				|	   _ ->
 		let len1 = List.length formals in
 		let len2 = List.length params in
 		if len1 <> len2 then
@@ -370,12 +370,12 @@ and check_func_call env fname el =
 		let actuals = handle_params the_func.sformals sel in
 		SCall(fname, actuals, the_func.stype), env)
 	with | Not_found ->
-                (*HH: later fname below should be changed to full_name*)
-            try( 
-                let the_func = StringMap.find fname global_func_map in
-                        let actuals = handle_params the_func.formals sel in
-                        SCall(fname, actuals, the_func.return_typ), env)
-            with | Not_found -> raise (Failure("Function " ^ fname ^ " not found."))
+				(*HH: later fname below should be changed to full_name*)
+			try( 
+				let the_func = StringMap.find fname global_func_map in
+						let actuals = handle_params the_func.formals sel in
+						SCall(fname, actuals, the_func.return_typ), env)
+			with | Not_found -> raise (Failure("Function " ^ fname ^ " not found."))
 
 (* Currently only casts primitives, and RHS must be a literal *)
 and check_cast env to_typ expr =
@@ -472,12 +472,10 @@ and check_expr env expr =
 and check_return env expr =
 	let sexpr, env = get_sexpr env expr in
 	let styp = get_type_from_sexpr sexpr in
-        match styp, env.env_ret_typ with
-        (* later object type ok to be NULL *)
-                _ -> 
-                    if env.env_ret_typ = styp
-                        then SReturn(sexpr, styp), env
-                        else raise(Failure("return type mismatch"))
+	if env.env_ret_typ = styp then
+		SReturn(sexpr, styp), env
+	else
+		raise(Failure("return type mismatch"))
 
 and check_if env if_expr if_stmts elseifs else_stmts =
 	let new_env = add_empty_block env "if" in
@@ -672,13 +670,14 @@ and get_sstmtl env stmtl =
 
 (* return type is handled in check_return *)
 let check_func_has_return fname sfbody return_typ =
-    let len = List.length sfbody in
-    if len = 0 then () else
-        let last_sstmt = List.hd (List.rev sfbody) in
-        match return_typ, last_sstmt with
-          Void, _ -> ()
-        | _, SReturn(_, _) -> ()
-        | _ -> raise(Failure("Missing return statement for a function that does not return void"))
+	let len = List.length sfbody in
+	if len = 0 then () else
+		let last_sstmt = List.hd (List.rev sfbody) in
+		match return_typ, last_sstmt with
+		  Void, _ -> ()
+		| _, SReturn(_, _) -> ()
+		| _ -> raise(Failure("Missing return statement for a function that " ^
+			"does not return void"))
 
 let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	let get_params_map map formal = match formal with
@@ -698,7 +697,7 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	} in
 	(* NOTE: tmp_env unused for now *)
 	let func_sbody, _ = get_sstmtl env fdecl.body in
-        ignore(check_func_has_return fdecl.fname func_sbody fdecl.return_typ);
+		ignore(check_func_has_return fdecl.fname func_sbody fdecl.return_typ);
 	{
 		stype = fdecl.return_typ;
 		sfname = fdecl.fname;
@@ -759,8 +758,8 @@ let get_sast class_maps reserved cdecls fdecls  =
 
 let check program = match program with
 	Program(globals) ->
-                let global_func_map = get_global_func_map globals.fdecls reserved_map
-                in global_func_map_ref := global_func_map;
+		let global_func_map = get_global_func_map globals.fdecls reserved_map
+		in global_func_map_ref := global_func_map;
 		let class_maps = get_class_maps globals.cdecls reserved_map in
 		let sast = get_sast class_maps reserved_list globals.cdecls globals.fdecls in
 		sast
