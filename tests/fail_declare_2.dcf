@@ -1,3 +1,4 @@
 main() -> int {
 	NonexistentObject o;
+	return -1;
 }

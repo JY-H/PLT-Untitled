@@ -1,4 +1,5 @@
 main() -> int {
 	int i;
 	i = 50.0;
+	return -1;
 }

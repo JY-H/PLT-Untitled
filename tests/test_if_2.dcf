@@ -9,4 +9,5 @@ main() -> int {
 	if (true) {
 		print("bat");
 	}
+	return 0;
 }

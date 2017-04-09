@@ -2,4 +2,5 @@ main() -> int {
 	float f = <float> 5.0;
 	bool b = <bool> 5.0;
 	int i = <int> 5.0;
+	return 0;
 }

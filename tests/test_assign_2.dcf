@@ -6,4 +6,5 @@ main() -> int {
 	int y;
 	y = 3 * 5;
 	x = y - 2 * 5;
+	return 0;
 }

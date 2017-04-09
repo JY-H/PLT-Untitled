@@ -10,4 +10,5 @@ main() -> int {
 	elseif (x > 3) {
 		print("bat");
 	}
+	return 0;
 }

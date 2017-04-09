@@ -5,4 +5,5 @@ main() -> int {
 	5 % 3;
 	'c';
 	"s";
+	return 0;
 }

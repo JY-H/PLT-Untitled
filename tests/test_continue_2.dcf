@@ -8,4 +8,5 @@ main() -> int {
 		}
 		print("bar");
 	}
+	return 0;
 }

@@ -22,4 +22,5 @@ main() -> int {
 			print("yes\n");
 		}
 	}
+	return 0;
 }

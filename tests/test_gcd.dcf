@@ -1,0 +1,18 @@
+gcd(int a, int b) -> int {
+	if (b === 0) {
+		return a;
+	}
+	return gcd(b, a%b);
+}
+
+main() -> int {
+	int a = 100;
+	int b = 20;
+	int c = 49;
+	int e = 29;
+	if (gcd(a, b) === 20 and gcd(c, e) === 1) {
+		print("I can do gcd -w-\n");
+	}
+	return 0;
+}
+

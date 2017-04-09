@@ -8,4 +8,5 @@ main() -> int {
 			int i;
 		}
 	}
+	return -1;
 }
