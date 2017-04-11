@@ -668,16 +668,67 @@ and get_sstmtl env stmtl =
 	in
 	let sstmts = (helper stmtl), !env_ref in sstmts
 
+(* Check that a block of statements has some return statement in it *)
+let check_block_return sblock = 
+	let sstmts = match sblock with
+		  SBlock(sstmts) -> sstmts
+		| _ -> raise(Failure("Can only check SBlocks"))
+	in
+	let rec find_return sstmts = match sstmts with
+		  [] -> raise(Failure("No return statement found in block"))
+		| head :: tail -> (match head with
+			  SReturn(_, _) -> ()
+			| _ -> find_return tail
+			)
+	in
+	find_return sstmts
+
 (* return type is handled in check_return *)
 let check_func_has_return fname sfbody return_typ =
 	let len = List.length sfbody in
-	if len = 0 then () else
-		let last_sstmt = List.hd (List.rev sfbody) in
-		match return_typ, last_sstmt with
-		  Void, _ -> ()
-		| _, SReturn(_, _) -> ()
-		| _ -> raise(Failure("Missing return statement for a function that " ^
-			"does not return void"))
+	if return_typ = Void then
+		()
+	else if len = 0 && return_typ != Void then
+		raise(Failure("Cannot have void return type and empty function"))
+	else
+		(* Check if there is any return statement in func body *)
+		let rec find_func_return sstmts = match sstmts with
+			  [] -> false
+			| head :: tail -> (match head with
+				  SReturn(_, _) -> true
+				| _ -> find_func_return tail
+				)
+		in
+		if find_func_return sfbody then
+			()
+		else
+			(* Check last statement for return *)
+			let last_sstmt = List.hd (List.rev sfbody) in
+			match last_sstmt with
+				  SReturn(_, _) -> ()
+				| SIf(if_sexpr, if_sstmts, elseifs, else_sstmts) ->
+					(* If func ends in an if, check each block has return *)
+					ignore(check_block_return if_sstmts);
+					let rec check_elseifs_return elseifs = match elseifs with
+						  [] -> ()
+						| head :: tail ->
+							let selseif = (match head with
+								  SElseif(sexpr, stmt) -> sexpr, stmt
+								| _ -> raise(Failure("Non-elseif found in " ^
+									"elseifs"))
+								)
+							in
+							let _, elseif_sstmts = selseif in
+							ignore(check_block_return elseif_sstmts);
+							check_elseifs_return tail
+					in
+					ignore(check_elseifs_return elseifs);
+					(* An if block at the end of a function body must have an
+					else clause to ensure a value is returned *)
+					check_block_return else_sstmts
+
+				| _ -> raise(Failure("Missing return statement for a " ^
+					"function that does not return void"))
 
 let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	let get_params_map map formal = match formal with

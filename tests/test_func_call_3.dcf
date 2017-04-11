@@ -1,10 +1,12 @@
 // recursive exponent method
-exp (int base, int power) -> int {
+exp(int base, int power) -> int {
 	if (power === 0) {
 		return 1;
-	} elseif (power === 1) {
+	}
+	elseif (power === 1) {
 		return base;
-	} else {
+	}
+	else {
 		return base * exp(base, power - 1);
 	}
 }
@@ -13,8 +15,11 @@ main() -> int {
 	int a;
 	a = exp(3, 2);
 	int b = exp(2, 4);
-	print(<string> a);
-	print(" ");
-	print(<string> b);
+	if (a === 9) {
+		print("a ");
+	}
+	if (b === 16) {
+		print("b");
+	}
 	return 0;
 }
