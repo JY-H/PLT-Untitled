@@ -751,7 +751,6 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	let func_sbody, _ = get_sstmtl env fdecl.body in
 	let func_sbody = List.rev(check_func_has_return fdecl.fname func_sbody
 	fdecl.return_typ :: List.rev(func_sbody)) in
-		ignore(check_func_has_return fdecl.fname func_sbody fdecl.return_typ);
 	{
 		stype = fdecl.return_typ;
 		sfname = fdecl.fname;
