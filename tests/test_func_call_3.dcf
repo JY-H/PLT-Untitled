@@ -1,0 +1,20 @@
+// recursive exponent method
+exp (int base, int power) -> int {
+	if (power === 0) {
+		return 1;
+	} elseif (power === 1) {
+		return base;
+	} else {
+		return base * exp(base, power - 1);
+	}
+}
+
+main() -> int {
+	int a;
+	a = exp(3, 2);
+	int b = exp(2, 4);
+	print(<string> a);
+	print(" ");
+	print(<string> b);
+	return 0;
+}
