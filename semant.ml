@@ -687,7 +687,7 @@ let check_block_return sblock =
 let check_func_has_return fname sfbody return_typ =
 	let len = List.length sfbody in
 	if return_typ = Void then
-		()
+		SExpr(SNoexpr, Void)
 	else if len = 0 && return_typ != Void then
 		raise(Failure("Cannot have void return type and empty function"))
 	else
@@ -700,12 +700,12 @@ let check_func_has_return fname sfbody return_typ =
 				)
 		in
 		if find_func_return sfbody then
-			()
+			SExpr(SNoexpr, Void)
 		else
 			(* Check last statement for return *)
 			let last_sstmt = List.hd (List.rev sfbody) in
 			match last_sstmt with
-				  SReturn(_, _) -> ()
+				  SReturn(_, _) -> SExpr(SNoexpr, Void)
 				| SIf(if_sexpr, if_sstmts, elseifs, else_sstmts) ->
 					(* If func ends in an if, check each block has return *)
 					ignore(check_block_return if_sstmts);
@@ -725,7 +725,8 @@ let check_func_has_return fname sfbody return_typ =
 					ignore(check_elseifs_return elseifs);
 					(* An if block at the end of a function body must have an
 					else clause to ensure a value is returned *)
-					check_block_return else_sstmts
+					ignore(check_block_return else_sstmts);
+					SReturn(SIntLit(0), Int)
 
 				| _ -> raise(Failure("Missing return statement for a " ^
 					"function that does not return void"))
@@ -748,6 +749,8 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	} in
 	(* NOTE: tmp_env unused for now *)
 	let func_sbody, _ = get_sstmtl env fdecl.body in
+	let func_sbody = List.rev(check_func_has_return fdecl.fname func_sbody
+	fdecl.return_typ :: List.rev(func_sbody)) in
 		ignore(check_func_has_return fdecl.fname func_sbody fdecl.return_typ);
 	{
 		stype = fdecl.return_typ;

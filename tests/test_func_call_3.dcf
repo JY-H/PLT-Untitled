@@ -16,10 +16,10 @@ main() -> int {
 	a = exp(3, 2);
 	int b = exp(2, 4);
 	if (a === 9) {
-		print("a ");
+		print("9\n");
 	}
 	if (b === 16) {
-		print("b");
+		print("16");
 	}
 	return 0;
 }
