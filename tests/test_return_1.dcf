@@ -1,0 +1,7 @@
+main() -> int {
+	// legal
+	print("print me!");
+	return 0;
+	print("don't print me!");
+	int i = 5;
+}
