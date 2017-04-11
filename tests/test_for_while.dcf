@@ -1,0 +1,12 @@
+main() -> int {
+	int i;
+	int j;
+	for (i = 0; i < 3; i = i + 1) {
+		j = 0;
+		while (j < i) {
+			print("ij\t");
+			j = j + 1;
+		}
+	}
+	return 0;
+}

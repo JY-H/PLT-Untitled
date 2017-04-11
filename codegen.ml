@@ -289,10 +289,13 @@ and print_gen llbuilder sexpr_list =
 		"print" llbuilder
 
 and ret_gen llbuilder sexpr t =
-		match sexpr with
-				  SId(name, t) -> build_ret (id_gen llbuilder name true) llbuilder
-				| SNoexpr -> build_ret_void llbuilder
-				| _ -> build_ret (sexpr_gen llbuilder sexpr) llbuilder
+	match sexpr with
+		  SId(name, t) -> 
+			L.build_ret (id_gen llbuilder name true) llbuilder
+		| SNoexpr ->
+			L.build_ret_void llbuilder
+		| _ ->
+			L.build_ret (sexpr_gen llbuilder sexpr) llbuilder
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	(* if expr *)
@@ -526,6 +529,7 @@ let func_body_gen sfdecl =
 	let loop_stack = [] in
 	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody))
 	in
+	ignore(L.build_unreachable llbuilder);
 		if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
 		()
 

@@ -1,0 +1,20 @@
+main() -> int {
+	int x = 12;
+	while (x > 9) {
+		x = minus(x);
+		print("minus\n");
+	}
+	while (x < 10) {
+		x = plus(x);
+		print("plus\n");
+	}
+	return 0;
+}
+
+minus(int i) -> int {
+	return i - 1;
+}
+
+plus(int i) -> int {
+	return i + 1;
+}

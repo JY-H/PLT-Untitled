@@ -1,0 +1,7 @@
+main() -> int {
+	int x = 5;
+	// Fails because you need an else to ensure return
+	if (x === 5) {
+		return 0;
+	}
+}

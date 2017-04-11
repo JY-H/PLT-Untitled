@@ -1,0 +1,12 @@
+main() -> int {
+	if (true) {
+		return 0;
+	}
+	elseif (true) {
+		int x = 0;
+		// Missing return
+	}
+	else {
+		return 0;
+	}
+}
