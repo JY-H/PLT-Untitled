@@ -8,6 +8,7 @@ module StringMap = Map.Make(String)
 type class_map = {
 	class_decl:		Ast.class_decl;
 	class_methods:	Ast.func_decl StringMap.t;
+	class_reserved_methods: Sast.sfunc_decl StringMap.t;
 	class_fields:	Ast.field StringMap.t;
 }
 
@@ -200,6 +201,7 @@ let get_class_maps cdecls reserved_map =
 					cdecl.cbody.fields;
 				class_methods = List.fold_left map_functions StringMap.empty
 					cdecl.cbody.methods;
+				class_reserved_methods = reserved_map;
 				class_decl = cdecl;
 			} map
 		)
@@ -324,7 +326,7 @@ and check_assign env expr1 expr2 =
 
 	(* Only allow assignment lhs to be id or object field *)
 	match sexpr1 with
-	  SId(id, _) | SFieldAccess(_, id, _) ->
+	  SId(_ as id, _) | SFieldAccess(_, _ as id, _) ->
 		(* Ensure id is not a const *)
 		if StringMap.mem id env.env_consts then
 			raise(Failure("Cannot assign to const id " ^ id))
@@ -403,6 +405,38 @@ and check_cast env to_typ expr =
 	in
 	scast, env
 
+and check_field_access env c f =
+	(* TODO: we are going to need to redo AST to handle how to determine obj types *)
+	let check_class_id expr = match expr with
+		  Id obj -> SId(obj, get_id_typ env obj)
+		| Self -> SId("self", Void) (* void dummy *)
+		| _ -> raise(Failure("Implement me"))
+	in
+	let get_class_name obj = match obj with
+		(* TODO: fill with type-specific find once AST is updated *)
+		_ -> raise(Failure("Missing object type"))
+	in
+
+	let rec check_field lhs_env typ top_env field_expr =
+		let class_name = get_class_name typ in
+		match field_expr with
+			Id id -> (
+				let class_map = StringMap.find class_name lhs_env.env_class_maps in
+				let match_field field = match field with
+					ObjVar(o_typ, name, _) -> SId(id, o_typ), lhs_env
+					| _ -> raise(Failure("Unrecognized field"))
+				in
+				try match_field (StringMap.find id class_map.class_fields)
+				with | Not_found -> raise(Failure("Unrecognized field")))
+			| _ -> raise(Failure("Unrecognized data type"))
+		in
+		let sexpr1 = check_class_id c in
+		let obj_type = get_type_from_sexpr sexpr1 in
+		let obj_env = update_env_name env (get_class_name obj_type) in
+		let sexpr2, _ = check_field obj_env obj_type env f in
+		let field_type = get_type_from_sexpr sexpr2 in
+		SFieldAccess(sexpr1, sexpr2, field_type)
+
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
 	| BoolLit(b) -> SBoolLit(b), env
@@ -415,8 +449,8 @@ and get_sexpr env expr = match expr with
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
-(*	| FieldAccess(e, s) -> check_field_access e s
-	| MethodCall*)
+	| FieldAccess(c, f) -> check_field_access env c f
+(*	| MethodCall*)
 	| FuncCall(str, el) -> check_func_call env str el
 (*			  | ObjCreate*)
 	| Self -> SId("self", Void), env (*void dummy*)

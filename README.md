@@ -20,12 +20,13 @@ make
     gcc [testfile.s]
     ```
 
-### TODO
+### NOTES
 Every pull request should come with a test case to prove that the newly implemented functionality fully works.
 
-#### Apr.1st: get everything you can do in main (aka everything you can do in C) done
-* priority:
+### TODO:
 * objects
+	- need to refactor how we deal with primitives and data types to handle addition of classes
+	- check_field_access still needs to be fleshed out
 
 #### TESTING TODOs:
 * Remember to add additional testing scripts if you implement a new functionality.

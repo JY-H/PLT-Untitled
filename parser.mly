@@ -91,6 +91,12 @@ fdecl:
 		formals = $3;
 		return_typ = $6;
 		body = List.rev $8 } }
+	| CLASSID LPAREN formals_opt RPAREN ARROW return_typ LBRACE stmt_list RBRACE
+	{ {
+		fname = $1;
+		formals = $3;
+		return_typ = $6;
+		body = List.rev $8 } }
 
 formals_opt:
 	  /* nothing */	{ [] }
