@@ -47,7 +47,7 @@ let rec get_llvm_type = function
 	| A.Void -> void_t
 	| A.String -> str_t
 	(* TODO: Add tuple/list types *)
-	| A.Obj(name) -> L.pointer_type(find_global_class name)
+	| A.ClassTyp(name) -> L.pointer_type(find_global_class name)
 	| _ -> raise(Failure("Type not yet supported."))
 
 and find_global_class name =
@@ -110,7 +110,7 @@ and sexpr_gen llbuilder = function
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
 		(* | SFieldAccess *)
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
-(*	  | SObjCreate *)
+(*	  | SClassTypCreate *)
 		| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise(Failure("Expression type not recognized.")) 
 
@@ -250,7 +250,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let rhs = match sexpr2 with
 		  SId(id, typ) -> (match typ with
-			  A.Obj(classname) -> id_gen llbuilder id false
+			  A.ClassTyp(classname) -> id_gen llbuilder id false
 			| _ -> id_gen llbuilder id true)
 		(* TODO: implement when field access allowed *)
 		(*| SFieldAccess(id, field, typ) ->*)
@@ -258,7 +258,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	in
 
 	let rhs = match typ with
-		  A.Obj(classname) ->
+		  A.ClassTyp(classname) ->
 			if is_obj_access then
 				rhs
 			else
@@ -473,7 +473,7 @@ and continue_gen llbuilder loop_stack =
 (* HH: made changes for the case of func parameters *)
 and local_var_gen llbuilder typ id sexpr =
 	let ltyp = match typ with
-	  A.Obj(classname) -> find_global_class classname
+	  A.ClassTyp(classname) -> find_global_class classname
 	| _ -> get_llvm_type typ
 	in
 

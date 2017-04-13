@@ -130,7 +130,7 @@ tuple_typ:
 	LPAREN typ RPAREN	{ Tuple($2) }
 
 obj_typ:
-	CLASSID				{ Obj($1) }
+	CLASSID				{ ClassTyp($1) }
 
 classid_list_opt:
 	/* nothing */ { Some [] }
@@ -182,9 +182,9 @@ stmt:
 
 catch_list:
 	  CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE
-		{ [Catch(Obj($3), $4, Block(List.rev $7))] }
+		{ [Catch(ClassTyp($3), $4, Block(List.rev $7))] }
 	| CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE catch_list
-		{ Catch(Obj($3), $4, Block(List.rev $7)) :: $9}
+		{ Catch(ClassTyp($3), $4, Block(List.rev $7)) :: $9}
 
 elseifs:
 	  ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE

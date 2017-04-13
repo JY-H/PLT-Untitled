@@ -281,7 +281,7 @@ and check_equality_op sexpr1 sexpr2 op typ1 typ2 = match op with
 	| Req | Rneq -> (match typ1, typ2 with
 			(* Superclasses (and classes in general) don't exist so this should
 			be replaced*)
-		  Obj(classname1), Obj(classname2) ->
+		  ClassTyp(classname1), ClassTyp(classname2) ->
 			if classname1 = classname2 then
 				SBinop(sexpr1, op, sexpr2, Bool)
 			else
@@ -419,45 +419,49 @@ and check_cast env to_typ expr =
 	in
 	scast, env
 
-and check_field_access env c f =
-	let field_id = match f with
-		  Id(id) -> Id(id)
-		| _ -> raise(Failure("Field must be an id"))
-	in
+and check_field_access env obj field =
 	(* TODO: we are going to need to redo AST to handle how to determine obj types *)
 	let check_class_id expr = match expr with
-		  Id obj -> SId(obj, get_id_typ env obj)
-		| Self -> SId("self", Void) (* void dummy *)
+		  Id(objname) -> 
+			(* Find class exists *)
+			if StringMap.mem objname env.env_class_maps then
+				fst (get_sexpr env expr)
+			else
+				raise(Failure("No such class found"))
+		| Self ->
+			SId("self", Void) (* void dummy *)
 		| _ -> raise(Failure("Implement me"))
 	in
-	let get_class_name obj = match obj with
+	(*let get_class_name obj = match obj with
 		(* TODO: fill with type-specific find once AST is updated *)
 		_ -> raise(Failure("Missing object type"))
-	in
+	in*)
 
-	let check_field lhs_env typ top_env field_expr =
-		let class_name = get_class_name typ in
-		match field_expr with
-			Id(id) -> (
-				let class_map = StringMap.find class_name lhs_env.env_class_maps in
-				(*let match_field field = match field with
-					  Id(o_typ, name, _) -> SId(id, o_typ)
-					| _ -> raise(Failure("Unrecognized field"))
-				in*)
+	(* Find the matching field for this particular class *)
+	let check_field class_sid expr =
+		match class_sid, expr with
+			(* Must be a class and id *)
+			  SId(classname, _), Id(id) ->
+				let class_map = StringMap.find classname env.env_class_maps in
 				if StringMap.mem id class_map.class_fields then
 					let field = StringMap.find id class_map.class_fields in
 					match field with
-						ObjVar(typ, id, _) | ObjConst(typ, id, _) -> SId(id, typ)
+						ObjVar(typ, id, _) | ObjConst(typ, id, _) ->
+							SId(id, typ)
 				else
-					raise(Failure("Unrecognized field")))
+					raise(Failure("Unrecognized field in class " ^
+					classname))
 			| _ -> raise(Failure("Unrecognized data type"))
 	in
-	let sexpr1 = check_class_id c in
-	let obj_type = get_type_from_sexpr sexpr1 in
-	let obj_env = update_env_name env (get_class_name obj_type) in
-	let sexpr2 = check_field obj_env obj_type env field_id in
-	let field_type = get_type_from_sexpr sexpr2 in
-	SFieldAccess(sexpr1, sexpr2, field_type), env
+	let field_expr = match field with
+		  Id(id) -> Id(id)
+		| _ -> raise(Failure("Field must be an id"))
+	in
+	(* Note: this likely won't work until objects are included in get_id_typ *)
+	let class_sid, _ = get_sexpr env obj in
+	let field_sid = check_field class_sid field_expr in
+	let field_type = get_type_from_sexpr field_sid in
+	SFieldAccess(class_sid, field_sid, field_type), env
 
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
@@ -471,7 +475,7 @@ and get_sexpr env expr = match expr with
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
-	| FieldAccess(c, f) -> check_field_access env c f
+	| FieldAccess(classid, field) -> check_field_access env classid field
 (*	| MethodCall*)
 	| FuncCall(str, el) -> check_func_call env str el
 (*			  | ObjCreate*)
@@ -508,10 +512,7 @@ and get_id_typ env id =
 		let param = StringMap.find id env.env_params in
 		(function Formal(typ, _) -> typ) param
 	else
-	(* Note: I don't check object fields because I assume you'll put self before
-	 the field name, i.e. self.field if you want to access the field.
-	 Additionally, to make "self" work we'll need to add some stuff to env to
-	 keep track of the current class scope, which can get messy *)
+	(* Note: Object fields are id's that are NOT handled by this currently *)
 		raise(Failure("Unknown identifier: " ^ id))
 
 let rec check_block env stmtl = match stmtl with
@@ -640,7 +641,7 @@ and check_local_var env typ id expr =
 		let sexpr, env = get_sexpr env expr in
 		(* If object type, check class name exists *)
 		match typ with
-			  Obj(classname) ->
+			  ClassTyp(classname) ->
 				if StringMap.mem classname env.env_class_maps then
 					SLocalVar(typ, id, sexpr), env
 				else
