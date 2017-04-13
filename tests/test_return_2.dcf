@@ -1,0 +1,17 @@
+main() -> int {
+	// Check nested ifs that are guaranteed to return
+	if (true) {
+		return 0;
+	}
+	elseif (false) {
+		if (true) {
+			return 0;
+		}
+		else {
+			return 0;
+		}
+	}
+	else {
+		return 0;
+	}
+}
