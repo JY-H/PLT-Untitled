@@ -224,7 +224,7 @@ expr:
 	| LPAREN expr RPAREN	{ $2 }
 	| sequence	{ $1 }
 	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
-	| expr DOT ID	{ FieldAccess($1, $3) }
+	| expr DOT ID	{ FieldAccess($1, Id($3)) }
 	| ID LPAREN actuals_opt RPAREN	{ FuncCall($1, $3) }
 	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
 	| obj_typ LPAREN actuals_opt RPAREN	{ ObjCreate($1, $3) }

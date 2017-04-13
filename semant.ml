@@ -326,19 +326,33 @@ and check_assign env expr1 expr2 =
 
 	(* Only allow assignment lhs to be id or object field *)
 	match sexpr1 with
-	  SId(_ as id, _) | SFieldAccess(_, _ as id, _) ->
-		(* Ensure id is not a const *)
-		if StringMap.mem id env.env_consts then
-			raise(Failure("Cannot assign to const id " ^ id))
-		(* Check types match *)
-		else if typ1 = typ2 then
-			SAssign(sexpr1, sexpr2, typ2), env
-		else
-			raise(Failure("Cannot assign type " ^
-				string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
-	(* TODO: when object access is a valid expr, ensure it is allowed as well *)
-	| _ -> raise(Failure("Invalid assignment: " ^
-		string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
+		  SId(id, _) ->
+			if StringMap.mem id env.env_consts then
+				raise(Failure("Cannot assign to const id " ^ id))
+			(* Check types match *)
+			else if typ1 = typ2 then
+				SAssign(sexpr1, sexpr2, typ2), env
+			else
+				raise(Failure("Cannot assign type " ^
+					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
+		| SFieldAccess(_, sid, _) ->
+			let id = match sid with
+				  SId(id, _) -> id
+				| _ -> raise(Failure("Object access only allowed on ids"))
+			in
+			(* Ensure id is not a const *)
+			if StringMap.mem id env.env_consts then
+				raise(Failure("Cannot assign to const id " ^ id))
+			(* Check types match *)
+			else if typ1 = typ2 then
+				SAssign(sexpr1, sexpr2, typ2), env
+			else
+				raise(Failure("Cannot assign type " ^
+					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
+		(* TODO: when object access is a valid expr, ensure it is allowed as
+		well *)
+		| _ -> raise(Failure("Invalid assignment: " ^
+			string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
 and check_func_call env fname el =
 		let global_func_map = !global_func_map_ref
@@ -406,6 +420,10 @@ and check_cast env to_typ expr =
 	scast, env
 
 and check_field_access env c f =
+	let field_id = match f with
+		  Id(id) -> Id(id)
+		| _ -> raise(Failure("Field must be an id"))
+	in
 	(* TODO: we are going to need to redo AST to handle how to determine obj types *)
 	let check_class_id expr = match expr with
 		  Id obj -> SId(obj, get_id_typ env obj)
@@ -417,25 +435,29 @@ and check_field_access env c f =
 		_ -> raise(Failure("Missing object type"))
 	in
 
-	let rec check_field lhs_env typ top_env field_expr =
+	let check_field lhs_env typ top_env field_expr =
 		let class_name = get_class_name typ in
 		match field_expr with
-			Id id -> (
+			Id(id) -> (
 				let class_map = StringMap.find class_name lhs_env.env_class_maps in
-				let match_field field = match field with
-					ObjVar(o_typ, name, _) -> SId(id, o_typ), lhs_env
+				(*let match_field field = match field with
+					  Id(o_typ, name, _) -> SId(id, o_typ)
 					| _ -> raise(Failure("Unrecognized field"))
-				in
-				try match_field (StringMap.find id class_map.class_fields)
-				with | Not_found -> raise(Failure("Unrecognized field")))
+				in*)
+				if StringMap.mem id class_map.class_fields then
+					let field = StringMap.find id class_map.class_fields in
+					match field with
+						ObjVar(typ, id, _) | ObjConst(typ, id, _) -> SId(id, typ)
+				else
+					raise(Failure("Unrecognized field")))
 			| _ -> raise(Failure("Unrecognized data type"))
-		in
-		let sexpr1 = check_class_id c in
-		let obj_type = get_type_from_sexpr sexpr1 in
-		let obj_env = update_env_name env (get_class_name obj_type) in
-		let sexpr2, _ = check_field obj_env obj_type env f in
-		let field_type = get_type_from_sexpr sexpr2 in
-		SFieldAccess(sexpr1, sexpr2, field_type)
+	in
+	let sexpr1 = check_class_id c in
+	let obj_type = get_type_from_sexpr sexpr1 in
+	let obj_env = update_env_name env (get_class_name obj_type) in
+	let sexpr2 = check_field obj_env obj_type env field_id in
+	let field_type = get_type_from_sexpr sexpr2 in
+	SFieldAccess(sexpr1, sexpr2, field_type), env
 
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
