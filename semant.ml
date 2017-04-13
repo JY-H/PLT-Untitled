@@ -420,22 +420,17 @@ and check_cast env to_typ expr =
 	scast, env
 
 and check_field_access env obj field =
-	(* TODO: we are going to need to redo AST to handle how to determine obj types *)
+	(* Find class exists *)
 	let check_class_id expr = match expr with
-		  Id(objname) -> 
-			(* Find class exists *)
-			if StringMap.mem objname env.env_class_maps then
-				fst (get_sexpr env expr)
-			else
-				raise(Failure("No such class found"))
+		  Id(id) -> 
+			let ctyp = get_id_typ env id in
+			SId(id, ctyp)
 		| Self ->
-			SId("self", Void) (* void dummy *)
-		| _ -> raise(Failure("Implement me"))
+			 (* void dummy, need to inspect current context for ClassTyp *)
+			SId("self", Void)
+		| _ -> raise(Failure("No matching class found for id " ^ 
+			string_of_expr expr))
 	in
-	(*let get_class_name obj = match obj with
-		(* TODO: fill with type-specific find once AST is updated *)
-		_ -> raise(Failure("Missing object type"))
-	in*)
 
 	(* Find the matching field for this particular class *)
 	let check_field class_sid expr =
@@ -446,8 +441,8 @@ and check_field_access env obj field =
 				if StringMap.mem id class_map.class_fields then
 					let field = StringMap.find id class_map.class_fields in
 					match field with
-						ObjVar(typ, id, _) | ObjConst(typ, id, _) ->
-							SId(id, typ)
+						ObjVar(ftyp, id, _) | ObjConst(ftyp, id, _) ->
+							SId(id, ftyp)
 				else
 					raise(Failure("Unrecognized field in class " ^
 					classname))
@@ -457,7 +452,6 @@ and check_field_access env obj field =
 		  Id(id) -> Id(id)
 		| _ -> raise(Failure("Field must be an id"))
 	in
-	(* Note: this likely won't work until objects are included in get_id_typ *)
 	let class_sid, _ = get_sexpr env obj in
 	let field_sid = check_field class_sid field_expr in
 	let field_type = get_type_from_sexpr field_sid in
@@ -513,6 +507,7 @@ and get_id_typ env id =
 		(function Formal(typ, _) -> typ) param
 	else
 	(* Note: Object fields are id's that are NOT handled by this currently *)
+		(* Found a matching class name *)
 		raise(Failure("Unknown identifier: " ^ id))
 
 let rec check_block env stmtl = match stmtl with
