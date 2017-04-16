@@ -1,0 +1,20 @@
+class Animal {
+	string name;
+	int legs;
+	bool tail;
+
+	Animal(string n, int l, bool t) -> void {
+	//	self.name = n;
+	//	self.legs = l;
+	//	self.tail = t;
+		//return self;
+	}
+}
+
+main() -> int {
+	print("Before object creation");
+	Animal cat;
+	//cat.name = "Bob";
+	//print(cat.name);
+	return 0;
+}

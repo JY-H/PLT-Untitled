@@ -427,16 +427,53 @@ and check_field_access env obj field =
 			SId(id, ctyp)
 		| Self ->
 			 (* void dummy, need to inspect current context for ClassTyp *)
-			SId("self", Void)
+			SId("self", ClassTyp(env.env_name))
 		| _ -> raise(Failure("No matching class found for id " ^ 
 			string_of_expr expr))
 	in
 
+	let get_class_name obj = match obj with
+		ClassTyp(name) -> name
+		| _ -> raise(Failure("Expected object type"))
+	in
+
 	(* Find the matching field for this particular class *)
-	let check_field class_sid expr =
-		match class_sid, expr with
-			(* Must be a class and id *)
-			  SId(classname, _), Id(id) ->
+	let rec check_field lhs_env class_sid top_env expr =
+		let class_name = get_class_name class_sid in
+		match expr with
+			Id(id) -> (
+				try (
+					let class_map = StringMap.find class_name
+						lhs_env.env_class_maps in
+					let match_field f = match f with
+						ObjVar(dt, _, _) | ObjConst(dt, _, _) ->
+							SId(id, dt), lhs_env
+						| _ -> raise(Failure("Not a variable or const"))
+					in
+					match_field (StringMap.find id class_map.class_fields))
+				with | Not_found -> raise(Failure("Unrecognized field")) )
+			| FieldAccess(e1, e2) ->
+				let old_env = lhs_env in
+				let lhs, new_lhs_env = check_field lhs_env class_sid
+					top_env e1 in
+				let lhs_typ = get_type_from_sexpr lhs in
+				let new_env = update_env_name new_lhs_env
+					(get_class_name lhs_typ) in
+				let rhs, _ = check_field new_env lhs_typ lhs_env e2 in
+				let rhs_typ = get_type_from_sexpr rhs in
+				SFieldAccess(lhs, rhs, rhs_typ), old_env
+			| _ -> raise(Failure("Unrecognized datatype"))
+	in
+	let sexpr1 = check_class_id obj in
+	let typ = get_type_from_sexpr sexpr1 in
+	let obj_env = update_env_name env (get_class_name typ) in
+	let sexpr2, _ = check_field obj_env typ env field in
+	let field_type = get_type_from_sexpr sexpr2 in
+	SFieldAccess(sexpr1, sexpr2, field_type), env
+		(* Must be a class and id
+		let check_field class_sid expr =
+			match class_sid, expr with
+			SId(classname, _), Id(id) ->
 				let class_map = StringMap.find classname env.env_class_maps in
 				if StringMap.mem id class_map.class_fields then
 					let field = StringMap.find id class_map.class_fields in
@@ -446,7 +483,7 @@ and check_field_access env obj field =
 				else
 					raise(Failure("Unrecognized field in class " ^
 					classname))
-			| _ -> raise(Failure("Unrecognized data type"))
+			| _ -> raise(Failure("Unrecognized data type") )
 	in
 	let field_expr = match field with
 		  Id(id) -> Id(id)
@@ -455,7 +492,7 @@ and check_field_access env obj field =
 	let class_sid, _ = get_sexpr env obj in
 	let field_sid = check_field class_sid field_expr in
 	let field_type = get_type_from_sexpr field_sid in
-	SFieldAccess(class_sid, field_sid, field_type), env
+	SFieldAccess(class_sid, field_sid, field_type), env*)
 
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
@@ -821,7 +858,6 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 		sbody = func_sbody;
 	}
 
-(* TODO: Things start screaming around here *)
 (* Helper method to extract sfdecls from fdecls within classes. *)
 let get_class_sfdecls reserved class_maps =
 	(* First use StringMap.fold to extract class decls from class_maps *)
