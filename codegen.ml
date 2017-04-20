@@ -27,6 +27,8 @@ module StringMap = Map.Make(String)
 let global_classes:(string, L.lltype) Hash.t = Hash.create 50
 let local_params:(string, L.llvalue) Hash.t = Hash.create 50
 let local_values:(string, L.llvalue) Hash.t = Hash.create 50
+let class_self:(string, L.llvalue) Hash.t = Hash.create 50
+let class_fields:(string, int) Hash.t = Hash.create 50
 
 let context = L.global_context()
 let codegen_module = L.create_module context "DECAF Codegen"
@@ -484,6 +486,14 @@ and local_var_gen llbuilder typ id sexpr =
 				SNoexpr -> alloc
 				| _ -> assign_gen llbuilder lhs sexpr typ
 
+and setup_self llbuilder class_name =
+	let typ = Hash.find global_classes class_name in
+	let alloc = L.build_malloc typ (class_name ^ "_this")
+		llbuilder in
+
+	ignore(Hash.add class_self class_name alloc);
+	alloc
+
 (* Declare all built-in functions. This should match the functions added in
  * semant.ml
  *)
@@ -494,15 +504,13 @@ let construct_library_functions =
 	in
 	()
 
-
 let init_params func formals =
 	let formal_array = Array.of_list (formals) in
 	Array.iteri (fun index value ->
 		let name = formal_array.(index) in
-				match name with A.Formal(t, n) ->
+				match name with A.Formal(_, n) ->
 		L.set_value_name n value;
 		Hash.add local_params n value; ) (L.params func)
-
 
 let func_stub_gen sfdecl =
 	let param_types = List.rev (
@@ -515,35 +523,44 @@ let func_stub_gen sfdecl =
 	in
 	L.define_function sfdecl.sfname stype codegen_module
 
-
 let func_body_gen sfdecl =
 	Hash.clear local_values;
 	Hash.clear local_params;
-	let func = func_lookup sfdecl.sfname
-	in
-	let llbuilder = L.builder_at_end context (L.entry_block func)
-	in
-	let _ = init_params func sfdecl.sformals
-	in
+	let func = func_lookup sfdecl.sfname in
+	let llbuilder = L.builder_at_end context (L.entry_block func) in
+	let _ = init_params func sfdecl.sformals in
 	(* Stack of loop blocks *)
 	let loop_stack = [] in
-	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody))
-	in
+	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody)) in
 	ignore(L.build_unreachable llbuilder);
 		if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
 		()
 
+let class_stub_gen s =
+	let typ = L.named_struct_type context s.scname in
+	Hash.add global_classes s.scname typ
+
+let class_gen s =
+	let typ = Hash.find global_classes s.scname in
+	let typ_lst = List.map (function
+		A.ObjVar(t, _, _) | A.ObjConst(t, _, _) ->
+			get_llvm_type t) s.scbody.sfields in
+	let name_lst = List.map (function
+		A.ObjVar(_, n, _) | A.ObjConst(_, n, _) ->
+			n) s.scbody.sfields in
+	(* adding i32_t and key *)
+	let typ_array = (Array.of_list typ_lst) in
+		List.iteri (fun i name ->
+			let full_name = s.scname ^ "." ^ name in
+			Hash.add class_fields full_name i;
+		) name_lst;
+	L.struct_set_body typ typ_array true
 
 let translate sprogram =
-	let _ = construct_library_functions
-	(*
-	in
-	let _ = List.map (fun s -> class_stub_gen s) sprogram.classes
-	in
-	let _ = List.map (fun s -> class_gen s) sprogram.classes*)
-		in
-	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions
-	in
-	let _ = List.map (fun f -> func_body_gen f) sprogram.functions
-	in
+	let _ = construct_library_functions in
+	let classes = List.map (fun s -> class_stub_gen s) sprogram.classes in
+	(* I WANNA PRINT HERE Hash.iter (fun k v-> print_string k) global_classes; *)
+	let _ = List.map (fun s -> class_gen s) sprogram.classes in
+	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
+	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
 	codegen_module
