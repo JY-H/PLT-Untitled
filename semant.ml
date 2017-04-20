@@ -207,6 +207,15 @@ let get_class_maps cdecls reserved_map =
 		)
 	in List.fold_left map_class StringMap.empty cdecls
 
+let get_scdecl_from_cdecl sfdecls (cdecl) =
+{
+	scname = cdecl.cname;
+	scbody = {
+		sfields = cdecl.cbody.fields;
+		smethods = sfdecls;
+	}
+}
+
 let get_type_from_sexpr = function
 	  SIntLit(_) -> Int
 	| SBoolLit(_) -> Bool
@@ -894,6 +903,20 @@ let get_sast class_maps reserved cdecls fdecls  =
 		else if ((List.length global_main_decls + List.length class_main_decls) > 1) then
 			raise (Failure("More than 1 main function defined."))
 	in
+	let get_cdecl cdecl =
+		let class_map = StringMap.find cdecl.cname class_maps in
+	let sfunc_lst = List.fold_left (fun ls f ->
+		(get_sfdecl_from_fdecl class_maps reserved f) ::
+			ls) [] cdecl.cbody.methods in
+		let scdecl = get_scdecl_from_cdecl sfunc_lst in
+		(scdecl, sfunc_lst)
+	in
+	let iter_cdecls t c =
+		let scdecl = get_cdecl c in
+		(fst scdecl :: fst t, snd scdecl @ snd t) in
+	let scdecl_lst, sfunc_lst = List.fold_left
+		iter_cdecls ([], []) cdecls in
+
 	let get_sfdecls l f =
 		let sfdecl = (get_sfdecl_from_fdecl class_maps reserved f) in sfdecl :: l
 	in
@@ -903,8 +926,8 @@ let get_sast class_maps reserved cdecls fdecls  =
 	let _ = check_main global_sfdecls
 	in
 	{
-		classes = [];
-		functions = global_sfdecls;
+		classes = scdecl_lst;
+		functions = global_sfdecls @ sfunc_lst;
 		reserved = reserved
 	}
 
