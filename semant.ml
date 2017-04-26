@@ -143,7 +143,7 @@ let reserved_map = List.fold_left (
  *)
 let get_fully_qualified_name class_name fdecl = match fdecl.fname with
 	  "main" -> "main"
-	| _ ->	class_name ^ "." ^ fdecl.fname
+	| _ ->	if class_name = "" then fdecl.fname else class_name ^ "." ^ fdecl.fname
 
 
 (* Put all global function declarations into a map *)
@@ -207,7 +207,7 @@ let get_class_maps cdecls reserved_map =
 		)
 	in List.fold_left map_class StringMap.empty cdecls
 
-let get_scdecl_from_cdecl sfdecls (cdecl) =
+let get_scdecl_from_cdecl sfdecls cdecl =
 {
 	scname = cdecl.cname;
 	scbody = {
@@ -241,9 +241,6 @@ let rec get_sexprl env el =
 			a_head :: (helper tl)
 		| [] -> []
 	in (helper el), !env_ref
-(*match el with
-			  [] -> []
-			| head::tail -> get_sexpr head :: (get_sexprl tail)*)
 
 (* Check a binop is valid *)
 and check_binop env expr1 op expr2 =
@@ -333,6 +330,9 @@ and check_assign env expr1 expr2 =
 	let typ1 = get_type_from_sexpr sexpr1 in
 	let typ2 = get_type_from_sexpr sexpr2 in
 
+        match (typ1, sexpr2) with
+                 ClassTyp(_), SNull -> SAssign(sexpr1, sexpr2, typ1), env
+                | _ ->
 	(* Only allow assignment lhs to be id or object field *)
 	match sexpr1 with
 		  SId(id, _) ->
@@ -358,15 +358,18 @@ and check_assign env expr1 expr2 =
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
-		(* TODO: when object access is a valid expr, ensure it is allowed as
-		well *)
 		| _ -> raise(Failure("Invalid assignment: " ^
 			string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
+(*func and method call*)
 and check_func_call env fname el =
 		let global_func_map = !global_func_map_ref
 		in
 	let sel, env = get_sexprl env el in
+        let cmap =
+            try StringMap.find env.env_name env.env_class_maps
+            with | Not_found -> raise(Failure("Class undefined " ^ env.env_name))
+        in
 	let check_param formal param =
 		let f_typ = match formal with Formal(t, _) -> t | _ -> Void in
 		let p_typ = get_type_from_sexpr param in
@@ -388,19 +391,23 @@ and check_func_call env fname el =
 			List.map2 check_param formals sel
 	in
 	
-	(* TODO: Define full name
-	let full_name = env.env_name ^ "." ^ fname in *)
+	let full_name = env.env_name ^ "." ^ fname in
 	try (
 		let the_func = StringMap.find fname reserved_map in
 		let actuals = handle_params the_func.sformals sel in
 		SCall(fname, actuals, the_func.stype), env)
 	with | Not_found ->
-				(*HH: later fname below should be changed to full_name*)
-			try( 
-				let the_func = StringMap.find fname global_func_map in
-						let actuals = handle_params the_func.formals sel in
-						SCall(fname, actuals, the_func.return_typ), env)
-			with | Not_found -> raise (Failure("Function " ^ fname ^ " not found."))
+	try( 
+		let the_func = StringMap.find fname global_func_map in
+		let actuals = handle_params the_func.formals sel in
+		SCall(fname, actuals, the_func.return_typ), env)
+	with | Not_found ->
+        try (
+                let the_func = StringMap.find full_name cmap.class_methods in
+                let actuals = handle_params the_func.formals sel in
+                SCall(full_name, actuals, the_func.return_typ), env)
+        with | Not_found ->
+            raise (Failure("Function " ^ fname ^ " not found."))
 
 (* Currently only casts primitives, and RHS must be a literal *)
 and check_cast env to_typ expr =
@@ -434,9 +441,7 @@ and check_field_access env obj field =
 		  Id(id) -> 
 			let ctyp = get_id_typ env id in
 			SId(id, ctyp)
-		| Self ->
-			 (* void dummy, need to inspect current context for ClassTyp *)
-			SId("self", ClassTyp(env.env_name))
+		| Self -> SId("self", ClassTyp(env.env_name))
 		| _ -> raise(Failure("No matching class found for id " ^ 
 			string_of_expr expr))
 	in
@@ -503,6 +508,16 @@ and check_field_access env obj field =
 	let field_type = get_type_from_sexpr field_sid in
 	SFieldAccess(class_sid, field_sid, field_type), env*)
 
+and check_object_create env t el =
+    let s = string_of_typ t in
+    let sel, env = get_sexprl env el in
+    let cmap =
+        try StringMap.find s env.env_class_maps
+        with | Not_found -> raise(Failure("cannot construct undefined class object"))
+    in
+    (* currently don't support constructor overloading *)
+    SObjCreate(t, sel), env
+
 and get_sexpr env expr = match expr with
 	  IntLit(i) -> SIntLit(i), env
 	| BoolLit(b) -> SBoolLit(b), env
@@ -516,10 +531,10 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| FieldAccess(classid, field) -> check_field_access env classid field
-(*	| MethodCall*)
+	| MethodCall(e, str, el) -> check_func_call env str el (*e is stored in env, but let's keep it that way and not bother to change ast*)
 	| FuncCall(str, el) -> check_func_call env str el
-(*			  | ObjCreate*)
-	| Self -> SId("self", Void), env (*void dummy*)
+	| ObjCreate(t, el) -> check_object_create env t el
+	| Self -> SId("self", ClassTyp(env.env_name)), env
 (*			  | Super*)
 	| Noexpr -> SNoexpr, env
 	| _ -> raise(Failure("cannot convert to sexpr")) (*dummy, delete later*)
@@ -570,6 +585,9 @@ and check_expr env expr =
 and check_return env expr =
 	let sexpr, env = get_sexpr env expr in
 	let styp = get_type_from_sexpr sexpr in
+        match styp, env.env_ret_typ with
+                 Null_t, ClassTyp(_) -> SReturn(sexpr, styp), env
+                | _ ->
 	if env.env_ret_typ = styp then
 		SReturn(sexpr, styp), env
 	else
@@ -840,14 +858,17 @@ let check_func_has_return fname sfbody return_typ =
 			raise(Failure("Missing return statement for a function that " ^
 			"does not return void"))
 
-let get_sfdecl_from_fdecl class_maps reserved fdecl =
+let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
+        let class_formal = Formal(ClassTyp(cname), "self")
+        in
 	let get_params_map map formal = match formal with
 		  Formal(_, name) -> StringMap.add name formal map
 	in
-	let parameters = List.fold_left
-		get_params_map StringMap.empty (fdecl.formals) in
+	let parameters = 
+            if cname = "" then List.fold_left get_params_map StringMap.empty (fdecl.formals)
+            else List.fold_left get_params_map StringMap.empty (class_formal :: fdecl.formals) in
 	let env = {
-		env_name = ""; (* Should be class name once classes happen *)
+		env_name = cname;
 		env_locals = StringMap.empty;
 		env_consts = StringMap.empty;
 		env_params = parameters;
@@ -862,28 +883,10 @@ let get_sfdecl_from_fdecl class_maps reserved fdecl =
 	fdecl.return_typ :: List.rev(func_sbody)) in
 	{
 		stype = fdecl.return_typ;
-		sfname = fdecl.fname;
-		sformals = fdecl.formals;
+		sfname = get_fully_qualified_name cname fdecl;
+		sformals = class_formal :: fdecl.formals;
 		sbody = func_sbody;
 	}
-
-(* Helper method to extract sfdecls from fdecls within classes. *)
-let get_class_sfdecls reserved class_maps =
-	(* First use StringMap.fold to extract class decls from class_maps *)
-	let class_sfdecls = StringMap.fold (
-		fun _ cmap lst ->
-			(* Then extract fdecls within each cdecl and convert to sfdecl. *)
-			let get_class_fnames = StringMap.fold
-				(fun _ method_decl _ ->
-					let sfdecl = get_sfdecl_from_fdecl class_maps reserved method_decl
-					in
-					sfdecl :: lst)
-				cmap.class_methods lst
-			in
-			get_class_fnames
-	) class_maps []
-	in
-	class_sfdecls
 
 (* Overview function to generate sast. We perform main checks here. *)
 let get_sast class_maps reserved cdecls fdecls  =
@@ -892,42 +895,54 @@ let get_sast class_maps reserved cdecls fdecls  =
 		| _ -> false
 	in
 	let check_main functions =
-		let global_main_decls = List.find_all find_main functions
+		let all_main_decls = List.find_all find_main functions
 		in
-		let class_sfdecls = get_class_sfdecls reserved class_maps
-		in
-		let class_main_decls = List.find_all find_main class_sfdecls
-		in
-		if ((List.length global_main_decls + List.length class_main_decls) < 1 ) then
+		if (List.length all_main_decls < 1 ) then
 			raise (Failure("Main not defined."))
-		else if ((List.length global_main_decls + List.length class_main_decls) > 1) then
+		else if (List.length all_main_decls  > 1) then
 			raise (Failure("More than 1 main function defined."))
+                else List.hd all_main_decls
 	in
-	let get_cdecl cdecl =
-		let class_map = StringMap.find cdecl.cname class_maps in
-	let sfunc_lst = List.fold_left (fun ls f ->
-		(get_sfdecl_from_fdecl class_maps reserved f) ::
+        (* later need to deal with overloading constructors
+         * we dictate that each class (unlike java) must have a constructor*)
+        let find_constructor scdecl =
+            let cons_name = scdecl.scname ^ "." ^ "constructor"
+            in
+            let is_func_constructor f = (f.sfname = cons_name)
+            in
+            let scmethods = scdecl.scbody.smethods
+            in
+            try let _ = List.find is_func_constructor scmethods
+            in
+            scmethods
+            with | Not_found -> raise(Failure("Constructor missing in class" ^ scdecl.scname))
+        in
+	let check_and_convert_cdecl cdecl =
+		(*let class_map = StringMap.find cdecl.cname class_maps in*)
+	        let sfunc_lst = List.fold_left (fun ls f ->
+		(get_sfdecl_from_fdecl class_maps reserved cdecl.cname f) ::
 			ls) [] cdecl.cbody.methods in
-		let scdecl = get_scdecl_from_cdecl sfunc_lst in
+		let scdecl = get_scdecl_from_cdecl sfunc_lst cdecl in
+                let constructor = find_constructor scdecl in
 		(scdecl, sfunc_lst)
 	in
-	let iter_cdecls t c =
-		let scdecl = get_cdecl c in
-		(fst scdecl :: fst t, snd scdecl @ snd t) in
-	let scdecl_lst, sfunc_lst = List.fold_left
-		iter_cdecls ([], []) cdecls in
-
+        let iter_cdecls t c =
+            let (scdecl, sfunc_lst) = check_and_convert_cdecl c in
+            (scdecl :: fst t, sfunc_lst @ snd t)
+        in
+        let scdecl_lst, sfunc_lst = List.fold_left iter_cdecls ([], []) cdecls
+        in
 	let get_sfdecls l f =
-		let sfdecl = (get_sfdecl_from_fdecl class_maps reserved f) in sfdecl :: l
+		let sfdecl = (get_sfdecl_from_fdecl class_maps reserved "" f) in (sfdecl :: l)
 	in
 	let global_sfdecls = List.fold_left get_sfdecls [] fdecls
 	in
 	(* Check that there is one main function. *)
-	let _ = check_main global_sfdecls
+	let _ = check_main (global_sfdecls @ sfunc_lst)
 	in
 	{
 		classes = scdecl_lst;
-		functions = global_sfdecls @ sfunc_lst;
+		functions = global_sfdecls;
 		reserved = reserved
 	}
 
@@ -938,5 +953,3 @@ let check program = match program with
 		let class_maps = get_class_maps globals.cdecls reserved_map in
 		let sast = get_sast class_maps reserved_list globals.cdecls globals.fdecls in
 		sast
-	(* TODO: A lot of shit. But check is the main function so we need to add top
-	 * level logic here. *)
