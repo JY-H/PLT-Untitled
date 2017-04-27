@@ -12,14 +12,15 @@ http://llvm.moe/ocaml/
 
 *)
 
-open Llvm
+(*open Llvm*)
 open Sast
 open Semant
-open Str
+(*open Str*)
 
 module L = Llvm
 module A = Ast 
 module S = Sast
+module Se = Semant
 
 module Hash = Hashtbl
 
@@ -48,6 +49,7 @@ let rec get_llvm_type = function
 	| A.Char -> i8_t
 	| A.Void -> void_t
 	| A.String -> str_t
+        | A.Null_t -> i32_t
 	(* TODO: Add tuple/list types *)
 	| A.ClassTyp(name) -> L.pointer_type(find_global_class name)
 	| _ -> raise(Failure("Type not yet supported."))
@@ -110,9 +112,9 @@ and sexpr_gen llbuilder = function
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
-		(* | SFieldAccess *)
+        | SFieldAccess(c, rhs, typ) -> field_access_gen llbuilder c rhs typ true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
-(*	  | SClassTypCreate *)
+        | SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
 		| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise(Failure("Expression type not recognized.")) 
 
@@ -245,8 +247,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
-		(* TODO: add functionality  for objects, tuples, etc. *)
-		(*| SFieldAccess(id, field, typ)) -> *)
+		(* TODO: add functionality  for tuples, etc. *)
+		| SFieldAccess(id, field, typ) -> field_access_gen llbuilder id field typ false, true
 		| _ -> raise(Failure("Unable to assign."))
 	in
 
@@ -254,8 +256,7 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 		  SId(id, typ) -> (match typ with
 			  A.ClassTyp(classname) -> id_gen llbuilder id false
 			| _ -> id_gen llbuilder id true)
-		(* TODO: implement when field access allowed *)
-		(*| SFieldAccess(id, field, typ) ->*)
+		| SFieldAccess(id, field, typ) -> field_access_gen llbuilder id field typ true
 		| _ -> sexpr_gen llbuilder sexpr2
 	in
 
@@ -265,11 +266,51 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 				rhs
 			else
 				L.build_load rhs "tmp" llbuilder
+                | A.Null_t -> L.const_null (get_llvm_type typ)
 		| _ -> rhs
 	in
 
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
+
+and field_access_gen llbuilder id rhs typ isAssign =
+    let check_id id =
+        match id with
+         SId(s, d) -> id_gen llbuilder s false
+        (* array *)
+        | _ -> raise(Failure("expected access lhs to be an id"))
+    in
+
+    let rec check_rhs isLHS par_exp par_typ rhs =
+        let class_name = A.string_of_typ par_typ in
+        match rhs with
+        SId(s, d) ->
+            let field_name = (class_name ^ "." ^ s) in
+            let field_index = Hash.find class_fields field_name in
+            let _val = L.build_struct_gep par_exp field_index s llbuilder in
+            let _val = match d with
+                A.ClassTyp(_) -> if isAssign then L.build_load _val s llbuilder else _val
+                | _ -> if isAssign then L.build_load _val s llbuilder else _val
+            in
+            _val
+        | SCall(fname, exprl, ftyp) -> call_gen llbuilder fname exprl ftyp
+        | SFieldAccess(e1, e2, d) ->
+                let e1_typ = Se.get_type_from_sexpr e1 in
+                let e1 = check_rhs true par_exp par_typ e1 in
+                let e2 = check_rhs true e1 e1_typ e2 in
+                e2
+        | _ -> raise(Failure("illegal rhs type for access"))
+    in
+    let id_typ = Se.get_type_from_sexpr id in
+    let id = check_id id in
+    let rhs = check_rhs true id id_typ rhs in
+    rhs
+
+and obj_create_gen llbuilder typ sexprl =
+    let f = func_lookup (A.string_of_typ typ) in
+    let params = List.map (sexpr_gen llbuilder) sexprl in
+    let obj = L.build_call f (Array.of_list params) "tmp" llbuilder in
+    obj
 
 and call_gen llbuilder fname sexprl stype =
 		match fname with
@@ -292,9 +333,12 @@ and print_gen llbuilder sexpr_list =
 
 and ret_gen llbuilder sexpr t =
 	match sexpr with
-		  SId(name, t) -> 
-			L.build_ret (id_gen llbuilder name true) llbuilder
-		| SNoexpr ->
+		  SId(name, t) ->
+                     (match t with
+                     | A.ClassTyp(_) -> L.build_ret (id_gen llbuilder name false) llbuilder
+                     | _ -> L.build_ret (id_gen llbuilder name true) llbuilder)
+                | SFieldAccess(e1, e2, d) -> L.build_ret (field_access_gen llbuilder e1 e2 d true) llbuilder
+                | SNoexpr ->
 			L.build_ret_void llbuilder
 		| _ ->
 			L.build_ret (sexpr_gen llbuilder sexpr) llbuilder
@@ -472,7 +516,6 @@ and continue_gen llbuilder loop_stack =
 		| [] -> raise(Failure("Continue found in non-loop"))
 
 (* Generates a local variable declaration *)
-(* HH: made changes for the case of func parameters *)
 and local_var_gen llbuilder typ id sexpr =
 	let ltyp = match typ with
 	  A.ClassTyp(classname) -> find_global_class classname
@@ -536,11 +579,10 @@ let func_body_gen sfdecl =
 		if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
 		()
 
-let class_stub_gen s =
-	let typ = L.named_struct_type context s.scname in
-	Hash.add global_classes s.scname typ
-
 let class_gen s =
+        let typ = L.named_struct_type context s.scname in
+        Hash.add global_classes s.scname typ;
+
 	let typ = Hash.find global_classes s.scname in
 	let typ_lst = List.map (function
 		A.ObjVar(t, _, _) | A.ObjConst(t, _, _) ->
@@ -554,13 +596,22 @@ let class_gen s =
 			let full_name = s.scname ^ "." ^ name in
 			Hash.add class_fields full_name i;
 		) name_lst;
-	L.struct_set_body typ typ_array true
+        L.struct_set_body typ typ_array true;
+
+	let _ = List.map (fun f -> func_stub_gen f) s.scbody.smethods in
+	let res = List.map (fun f -> func_body_gen f) s.scbody.smethods in
+        res
+
+
+(*TBA: probably needed when inheritance happens
+let vtbl_gen scdecls =
+            *)
 
 let translate sprogram =
 	let _ = construct_library_functions in
-	let classes = List.map (fun s -> class_stub_gen s) sprogram.classes in
 	(* I WANNA PRINT HERE Hash.iter (fun k v-> print_string k) global_classes; *)
 	let _ = List.map (fun s -> class_gen s) sprogram.classes in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
+        (*        let _ = vtbl_gen sprogram.classes in*)
 	codegen_module

@@ -858,6 +858,15 @@ let check_func_has_return fname sfbody return_typ =
 			raise(Failure("Missing return statement for a function that " ^
 			"does not return void"))
 
+
+(* need malloc? *)
+let get_constructor_from_fdecl cname fdecl = {
+    return_typ = ClassTyp(cname);
+    fname = fdecl.fname;
+    formals = fdecl.formals;
+    body = fdecl.body @ [Return(Id("self"))];
+}
+
 let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
         let class_formal = Formal(ClassTyp(cname), "self")
         in
@@ -867,6 +876,9 @@ let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
 	let parameters = 
             if cname = "" then List.fold_left get_params_map StringMap.empty (fdecl.formals)
             else List.fold_left get_params_map StringMap.empty (class_formal :: fdecl.formals) in
+        let is_constructor = (fdecl.fname = cname) in
+        let fdecl = if is_constructor then get_constructor_from_fdecl cname fdecl else fdecl
+        in
 	let env = {
 		env_name = cname;
 		env_locals = StringMap.empty;
@@ -906,7 +918,7 @@ let get_sast class_maps reserved cdecls fdecls  =
         (* later need to deal with overloading constructors
          * we dictate that each class (unlike java) must have a constructor*)
         let find_constructor scdecl =
-            let cons_name = scdecl.scname ^ "." ^ "constructor"
+            let cons_name = scdecl.scname
             in
             let is_func_constructor f = (f.sfname = cons_name)
             in
@@ -923,7 +935,7 @@ let get_sast class_maps reserved cdecls fdecls  =
 		(get_sfdecl_from_fdecl class_maps reserved cdecl.cname f) ::
 			ls) [] cdecl.cbody.methods in
 		let scdecl = get_scdecl_from_cdecl sfunc_lst cdecl in
-                let constructor = find_constructor scdecl in
+                let _ = find_constructor scdecl in
 		(scdecl, sfunc_lst)
 	in
         let iter_cdecls t c =
