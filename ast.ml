@@ -7,8 +7,8 @@ type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 
 type uop = Neg | Not | Remove
 
-type typ = Int | Float | Bool | Char | String | Void | Null_t |
-	Tuple of typ | Lst of typ | ClassTyp of string
+type typ = Int | Float | Bool | Char | String | Void | Null_t | Any |
+	Tuple of typ | Lst of typ | ClassTyp of string | CharArray of int
 
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
@@ -96,6 +96,7 @@ let rec string_of_typ = function
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
 	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
 	| ClassTyp(id) -> id
+        | CharArray(n) -> "array of length " ^ string_of_int n
 
 let string_of_op = function
 	  Add -> "+"

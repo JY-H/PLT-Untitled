@@ -312,16 +312,35 @@ and obj_create_gen llbuilder typ sexprl =
     let obj = L.build_call f (Array.of_list params) "tmp" llbuilder in
     obj
 
+and cast_malloc_gen llbuilder sexprl stype =
+    let cast_malloc llbuilder lhs curTyp newTyp =
+        match newTyp with
+            A.ClassTyp(c) -> let obj_llvm_typ = get_llvm_type (A.ClassTyp(c)) in L.build_pointercast lhs obj_llvm_typ "tmp" llbuilder
+        | _ as c -> raise(Failure("RIP cannot cast to " ^ A.string_of_typ c))
+    in
+    let sexpr = List.hd sexprl in
+    let old_typ = Se.get_type_from_sexpr sexpr in
+    let lhs = match sexpr with
+          SId(id, d) -> id_gen llbuilder id false
+        | SFieldAccess(e1, e2, d) -> field_access_gen llbuilder e1 e2 d false
+        | _ -> sexpr_gen llbuilder sexpr
+    in
+    cast_malloc llbuilder lhs old_typ stype
+
+and func_call_gen llbuilder fname sexprl stype =
+    let the_func = func_lookup fname in
+    let params = List.map (sexpr_gen llbuilder) sexprl in
+    match stype with
+	A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
+        | _ -> L.build_call the_func (Array.of_list params) "tmp" llbuilder
+
 and call_gen llbuilder fname sexprl stype =
 		match fname with
-		(*here should be a full list of built-in and linked functions*)
+                (* full list of built-in and linked functions just for clarity*)
 				 "print" -> print_gen llbuilder sexprl
-				| _ ->
-				let the_func = func_lookup fname in
-				let params = List.map (sexpr_gen llbuilder) sexprl in
-				match stype with
-						  A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
-						| _ -> L.build_call the_func (Array.of_list params) "tmp" llbuilder
+                                | "malloc" -> func_call_gen llbuilder fname sexprl stype
+                                | "cast" -> cast_malloc_gen llbuilder sexprl stype
+				| _ -> func_call_gen llbuilder fname sexprl stype
 
 (* Helper method to generate print function for strings. *)
 and print_gen llbuilder sexpr_list =
@@ -545,6 +564,9 @@ let construct_library_functions =
 	in
 	let _ = L.declare_function "printf" print_type codegen_module
 	in
+        let malloc_type = L.function_type (str_t) [| i32_t |] in
+        let _ = L.declare_function "malloc" malloc_type codegen_module
+        in
 	()
 
 let init_params func formals =

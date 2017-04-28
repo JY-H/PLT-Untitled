@@ -128,8 +128,15 @@ let reserved_list =
 			sbody = [];
 		}
 	in
+        (* wrapper types, so that Any can be used *)
+        let char_t = CharArray(1) in
+        let str_t = String in
+        let int_t = Int in
+        let void_t = Void in
 	let reserved = [
-		reserved_struct "print" (Ast.Void) ([Formal(Ast.String, "string_arg")]);
+		reserved_struct "print" (Void) ([Formal(String, "string_arg")]);
+                reserved_struct "malloc" (CharArray(1)) ([Formal(Int, "size")]);
+                reserved_struct "cast" (Any) ([Formal(Any, "victim")]);
 	]
 	in
 	reserved
@@ -857,14 +864,33 @@ let check_func_has_return fname sfbody return_typ =
 			raise(Failure("Missing return statement for a function that " ^
 			"does not return void"))
 
+(* return sfdecl for constructor *)
+let get_constructor_from_fdecl cname fdecl env =
+    let class_typ = ClassTyp(cname) in
+    let init_self = [SLocalVar(class_typ, "self",
+        SCall("cast", 
+            [SCall("malloc", [SIntLit(100)], CharArray(100))], (*100 should be sizeof*)
+            class_typ))]
+    in
+    let env = {
+		env_name = cname;
+		env_locals = StringMap.empty;
+		env_consts = StringMap.empty;
+		env_params = env.env_params;
+		env_ret_typ = class_typ;
+		env_reserved = env.env_reserved;
+		env_class_maps = env.env_class_maps;
+		env_blocks = [];
+     } in
+	(* does not check return: append later *)
+	let func_sbody, _ = get_sstmtl env fdecl.body in
+	{
+		stype = class_typ;
+		sfname = get_fully_qualified_name cname fdecl.fname;
+		sformals = Formal(class_typ, "self") :: fdecl.formals;
+		sbody = init_self @ func_sbody @ [SReturn(SId("self", class_typ), class_typ)];
+	}
 
-(* need malloc? *)
-let get_constructor_from_fdecl cname fdecl = {
-    return_typ = ClassTyp(cname);
-    fname = fdecl.fname;
-    formals = fdecl.formals;
-    body = fdecl.body @ [Return(Id("self"))];
-}
 (*
 let get_default_constructor cname = {
     stype = Null_t;
@@ -873,10 +899,12 @@ let get_default_constructor cname = {
     sbody = [SReturn(SNull, Null_t)];
 }
 *)
+
+(* convert fdecl to sfdecl, constructors handled separately *)
 let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
         let is_global = (cname = "")
         in
-        (* only add self if this function is not global or not main in class*)
+        (* only add self if this function is not global or not main() in a class*)
         let class_formal = Formal(ClassTyp(cname), "self")
         in
 	let get_params_map map formal = match formal with
@@ -886,10 +914,7 @@ let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
         in
 	let parameters = List.fold_left get_params_map StringMap.empty all_formals
         in
-        let is_constructor = ((not is_global) && fdecl.fname = cname) in
-        let fdecl = if is_constructor then get_constructor_from_fdecl cname fdecl else fdecl
-        in
-	let env = {
+        let env = {
 		env_name = cname;
 		env_locals = StringMap.empty;
 		env_consts = StringMap.empty;
@@ -899,6 +924,9 @@ let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
 		env_class_maps = class_maps;
 		env_blocks = [];
 	} in
+        let is_constructor = ((not is_global) && fdecl.fname = cname) in
+        let sfdecl = if is_constructor then get_constructor_from_fdecl cname fdecl env
+        else
 	(* NOTE: tmp_env unused for now *)
 	let func_sbody, _ = get_sstmtl env fdecl.body in
 	let func_sbody = List.rev(check_func_has_return fdecl.fname func_sbody
@@ -909,6 +937,8 @@ let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
 		sformals = all_formals;
 		sbody = func_sbody;
 	}
+        in
+        sfdecl
 
 (* Overview function to generate sast. We perform main checks here. *)
 let get_sast class_maps reserved cdecls fdecls  =
