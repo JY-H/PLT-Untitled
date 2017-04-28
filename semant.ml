@@ -138,13 +138,13 @@ let reserved_map = List.fold_left (
 			fun map f -> StringMap.add f.sfname f map
 		) StringMap.empty reserved_list
 
-(* Helper function to get fully qualified names so that we can distinguish
- * between global functions and class functions of the same name
- *)
-let get_fully_qualified_name class_name fdecl = match fdecl.fname with
-	  "main" -> "main"
-	| _ ->	if class_name = "" then fdecl.fname else class_name ^ "." ^ fdecl.fname
 
+(* global functions, main and constructors retain their original names
+ * constructors retain their names because they are only the methods that
+ * can be called outside the class (i.e. env_name = "") w/out obj.method...; janky, but we really should have parsed constructors and methods separately *)
+let get_fully_qualified_name class_name fname = match fname with
+	  "main" -> "main"
+	| _ ->	if (class_name = "" || class_name = fname) then fname else class_name ^ "." ^ fname
 
 (* Put all global function declarations into a map *)
 (* if we keep reserved_map global, can rid of the second argument*)
@@ -181,7 +181,7 @@ let get_class_maps cdecls reserved_map =
 
 		(* Map all functions within class declarations. *)
 		let map_functions map fdecl =
-			let func_full_name = get_fully_qualified_name cdecl.cname fdecl
+			let func_full_name = get_fully_qualified_name cdecl.cname fdecl.fname
 			in
 			if (StringMap.mem func_full_name map) then
 				raise (Failure(" duplicate function: " ^ func_full_name))
@@ -366,10 +366,6 @@ and check_func_call env fname el =
 		let global_func_map = !global_func_map_ref
 		in
 	let sel, env = get_sexprl env el in
-        let cmap =
-            try StringMap.find env.env_name env.env_class_maps
-            with | Not_found -> raise(Failure("Class undefined " ^ env.env_name))
-        in
 	let check_param formal param =
 		let f_typ = match formal with Formal(t, _) -> t | _ -> Void in
 		let p_typ = get_type_from_sexpr param in
@@ -391,7 +387,7 @@ and check_func_call env fname el =
 			List.map2 check_param formals sel
 	in
 	
-	let full_name = env.env_name ^ "." ^ fname in
+	let full_name = get_fully_qualified_name env.env_name fname in
 	try (
 		let the_func = StringMap.find fname reserved_map in
 		let actuals = handle_params the_func.sformals sel in
@@ -403,6 +399,9 @@ and check_func_call env fname el =
 		SCall(fname, actuals, the_func.return_typ), env)
 	with | Not_found ->
         try (
+                let cmap = try StringMap.find env.env_name env.env_class_maps
+                with | Not_found -> raise(Failure("Class undefined " ^ env.env_name))
+                in
                 let the_func = StringMap.find full_name cmap.class_methods in
                 let actuals = handle_params the_func.formals sel in
                 SCall(full_name, actuals, the_func.return_typ), env)
@@ -531,7 +530,7 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| FieldAccess(classid, field) -> check_field_access env classid field
-	| MethodCall(e, str, el) -> check_func_call env str el (*e is stored in env, but let's keep it that way and not bother to change ast*)
+	| MethodCall(e, str, el) -> check_func_call env str el
 	| FuncCall(str, el) -> check_func_call env str el
 	| ObjCreate(t, el) -> check_object_create env t el
 	| Self -> SId("self", ClassTyp(env.env_name)), env
@@ -866,17 +865,28 @@ let get_constructor_from_fdecl cname fdecl = {
     formals = fdecl.formals;
     body = fdecl.body @ [Return(Id("self"))];
 }
-
+(*
+let get_default_constructor cname = {
+    stype = Null_t;
+    sfname = cname;
+    sformals = [Formal(ClassTyp(cname), "self")];
+    sbody = [SReturn(SNull, Null_t)];
+}
+*)
 let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
+        let is_global = (cname = "")
+        in
+        (* only add self if this function is not global or not main in class*)
         let class_formal = Formal(ClassTyp(cname), "self")
         in
 	let get_params_map map formal = match formal with
 		  Formal(_, name) -> StringMap.add name formal map
 	in
-	let parameters = 
-            if cname = "" then List.fold_left get_params_map StringMap.empty (fdecl.formals)
-            else List.fold_left get_params_map StringMap.empty (class_formal :: fdecl.formals) in
-        let is_constructor = (fdecl.fname = cname) in
+        let all_formals = if (is_global || fdecl.fname = "main") then fdecl.formals else (class_formal :: fdecl.formals)
+        in
+	let parameters = List.fold_left get_params_map StringMap.empty all_formals
+        in
+        let is_constructor = ((not is_global) && fdecl.fname = cname) in
         let fdecl = if is_constructor then get_constructor_from_fdecl cname fdecl else fdecl
         in
 	let env = {
@@ -895,8 +905,8 @@ let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
 	fdecl.return_typ :: List.rev(func_sbody)) in
 	{
 		stype = fdecl.return_typ;
-		sfname = get_fully_qualified_name cname fdecl;
-		sformals = class_formal :: fdecl.formals;
+		sfname = get_fully_qualified_name cname fdecl.fname;
+		sformals = all_formals;
 		sbody = func_sbody;
 	}
 
@@ -915,8 +925,7 @@ let get_sast class_maps reserved cdecls fdecls  =
 			raise (Failure("More than 1 main function defined."))
                 else List.hd all_main_decls
 	in
-        (* later need to deal with overloading constructors
-         * we dictate that each class (unlike java) must have a constructor*)
+        (* later need to deal with overloading constructave a default currently useless constructor, later may initialize everything to 0, etc. *)
         let find_constructor scdecl =
             let cons_name = scdecl.scname
             in
@@ -927,10 +936,10 @@ let get_sast class_maps reserved cdecls fdecls  =
             try let _ = List.find is_func_constructor scmethods
             in
             scmethods
-            with | Not_found -> raise(Failure("Constructor missing in class" ^ scdecl.scname))
+            (* only when a class called Main it does not need to have constructor *)
+            with | Not_found -> if cons_name = "Main" then scmethods else raise(Failure("This class has no constructor"))
         in
 	let check_and_convert_cdecl cdecl =
-		(*let class_map = StringMap.find cdecl.cname class_maps in*)
 	        let sfunc_lst = List.fold_left (fun ls f ->
 		(get_sfdecl_from_fdecl class_maps reserved cdecl.cname f) ::
 			ls) [] cdecl.cbody.methods in
@@ -964,4 +973,4 @@ let check program = match program with
 		in global_func_map_ref := global_func_map;
 		let class_maps = get_class_maps globals.cdecls reserved_map in
 		let sast = get_sast class_maps reserved_list globals.cdecls globals.fdecls in
-		sast
+                sast

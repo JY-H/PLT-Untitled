@@ -3,18 +3,17 @@ class Animal {
 	int legs;
 	bool tail;
 
-	Animal(string n, int l, bool t) -> void {
-	//	self.name = n;
-	//	self.legs = l;
-	//	self.tail = t;
-		//return self;
+	Animal(string n, int l, bool t) -> Animal {
+		self.name = n;
+		self.legs = l;
+		self.tail = t;
 	}
 }
 
 main() -> int {
 	print("Before object creation");
-	Animal cat;
-	//cat.name = "Bob";
-	//print(cat.name);
+	Animal cat = Animal("Amy", 3, true);
+	cat.name = "Bob";
+	print(cat.name);
 	return 0;
 }

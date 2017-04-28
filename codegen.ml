@@ -51,12 +51,12 @@ let rec get_llvm_type = function
 	| A.String -> str_t
         | A.Null_t -> i32_t
 	(* TODO: Add tuple/list types *)
-	| A.ClassTyp(name) -> L.pointer_type(find_global_class name)
+        | A.ClassTyp(name) -> L.pointer_type(find_global_class name)
 	| _ -> raise(Failure("Type not yet supported."))
 
 and find_global_class name =
 	try Hash.find global_classes name
-	with Not_found -> raise(Failure("Invalid class name."))
+	with Not_found -> raise(Failure("Invalid class name " ^ name))
 
 let rec id_gen llbuilder id is_deref =
 	if is_deref then
@@ -518,7 +518,7 @@ and continue_gen llbuilder loop_stack =
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id sexpr =
 	let ltyp = match typ with
-	  A.ClassTyp(classname) -> find_global_class classname
+          A.ClassTyp(classname) -> find_global_class classname
 	| _ -> get_llvm_type typ
 	in
 
@@ -610,7 +610,7 @@ let vtbl_gen scdecls =
 let translate sprogram =
 	let _ = construct_library_functions in
 	(* I WANNA PRINT HERE Hash.iter (fun k v-> print_string k) global_classes; *)
-	let _ = List.map (fun s -> class_gen s) sprogram.classes in
+        let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) sprogram.classes else [] in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
         (*        let _ = vtbl_gen sprogram.classes in*)
