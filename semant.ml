@@ -237,6 +237,7 @@ let get_type_from_sexpr = function
 	| SCast(t, _) -> t
 	| SFieldAccess(_, _, t) -> t
 	| SCall(_, _, t) -> t
+        | SMethodCall(_, _, _, t) -> t
 	| SObjCreate(t, _) -> t
 	| SNoexpr -> Void
 
@@ -368,7 +369,13 @@ and check_assign env expr1 expr2 =
 		| _ -> raise(Failure("Invalid assignment: " ^
 			string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
-(*func and method call; obj_id used to know the context *)
+and check_method_call env e fname el =
+    let obj_id = match e with
+          Id(id) -> id
+        | _ -> raise(Failure("unsupported chained call")) in (* later can process recursively for a.b.call() *)
+    check_func_call env fname el obj_id
+
+(*func and method call; obj_id used to distinguish *)
 and check_func_call env fname el obj_id =
     let (local_context, local_context_typ) = if obj_id = "" then ("", Null_t) else 
         let obj_typ = get_id_typ env obj_id in
@@ -416,7 +423,7 @@ and check_func_call env fname el obj_id =
                 let the_func = StringMap.find full_name cmap.class_methods in
                 let actuals = handle_params the_func.formals sel in
 (*                let actuals = SId(obj_id, local_context_typ) :: actuals in*)
-                SCall(full_name, actuals, the_func.return_typ), env)
+                SMethodCall(SId(obj_id, local_context_typ), full_name, actuals, the_func.return_typ), env)
         with | Not_found ->
             raise (Failure("Function " ^ fname ^ " not found."))
 
@@ -477,12 +484,7 @@ and check_field_access env obj field =
 					in
 					match_field (StringMap.find id class_map.class_fields))
 				with | Not_found -> raise(Failure("Unrecognized field")) )
-                        | MethodCall(obj, fname, el) ->
-                                let local_env =
-                                        update_env_name env class_name in
-                                ignore(raise(Failure(class_name)));
-                                check_func_call env fname el class_name
-			| FieldAccess(e1, e2) ->
+                    	| FieldAccess(e1, e2) ->
 				let old_env = lhs_env in
 				let lhs, new_lhs_env = check_field lhs_env class_sid
 					top_env e1 in
@@ -550,7 +552,7 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| FieldAccess(classid, field) -> check_field_access env classid field
-        | MethodCall(e, str, el) -> check_func_call env str el (string_of_expr e)
+        | MethodCall(e, str, el) -> check_method_call env e str el
         (* does not work on class whose field is a class e.g. a.b.method(), should be fixable by recursively processing e in check_func_call *)
 	| FuncCall(str, el) -> check_func_call env str el ""
         | ObjCreate(t, el) -> check_object_create env t el
@@ -883,7 +885,7 @@ let get_constructor_from_fdecl cname fdecl env =
     let class_typ = ClassTyp(cname) in
     let init_self = [SLocalVar(class_typ, "self",
         SCall("cast", 
-            [SCall("malloc", [SIntLit(100)], CharArray(100))], (*100 should be sizeof*)
+            [SCall("malloc", [SIntLit(13)], CharArray(13))], (*13 should be sizeof*)
             class_typ))]
     in
     let env = {

@@ -114,6 +114,7 @@ and sexpr_gen llbuilder = function
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
         | SFieldAccess(c, rhs, typ) -> field_access_gen llbuilder c rhs typ true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
+        | SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
         | SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
 		| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise(Failure("Expression type not recognized.")) 
@@ -326,6 +327,25 @@ and cast_malloc_gen llbuilder sexprl stype =
         | _ -> sexpr_gen llbuilder sexpr
     in
     cast_malloc llbuilder lhs old_typ stype
+
+and method_call_gen llbuilder obj_expr fname sexprl styp =
+    match obj_expr with
+    SId(obj_name, obj_typ) ->
+        let the_func = func_lookup fname in
+        let match_sexpr se = match se with
+          SId(id, d) -> let isDeref = match d with
+                  A.ClassTyp(_) -> false
+                | _ -> true
+        in id_gen llbuilder id isDeref
+        | se -> sexpr_gen llbuilder se
+        in
+        let lhs = match_sexpr obj_expr in
+        let self_param = L.build_pointercast lhs (get_llvm_type obj_typ) "tmp" llbuilder in
+        let params = List.map match_sexpr sexprl in
+        match styp with
+                A.Void -> L.build_call the_func (Array.of_list (self_param :: params)) "" llbuilder
+        | _ -> L.build_call the_func (Array.of_list (self_param :: params)) "tmp" llbuilder
+    | _ -> raise(Failure("unsupported chained method call"))
 
 and func_call_gen llbuilder fname sexprl stype =
     let the_func = func_lookup fname in
