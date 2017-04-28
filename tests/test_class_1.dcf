@@ -8,12 +8,19 @@ class Animal {
 		self.legs = l;
 		self.tail = t;
 	}
+
+	talk() -> void {
+		print("hi");
+		return;
+	}
 }
 
 main() -> int {
-	print("Before object creation");
 	Animal cat = Animal("Amy", 3, true);
+	string old_name = cat.name;
+	print(old_name);
 	cat.name = "Bob";
 	print(cat.name);
+	cat.talk();
 	return 0;
 }
