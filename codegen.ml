@@ -548,13 +548,13 @@ and local_var_gen llbuilder typ id sexpr =
 				SNoexpr -> alloc
 				| _ -> assign_gen llbuilder lhs sexpr typ
 
-and setup_self llbuilder class_name =
+(*and setup_self llbuilder class_name =
 	let typ = Hash.find global_classes class_name in
 	let alloc = L.build_malloc typ (class_name ^ "_this")
 		llbuilder in
 
 	ignore(Hash.add class_self class_name alloc);
-	alloc
+	alloc*)
 
 (* Declare all built-in functions. This should match the functions added in
  * semant.ml

@@ -368,8 +368,9 @@ and check_assign env expr1 expr2 =
 		| _ -> raise(Failure("Invalid assignment: " ^
 			string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
-(*func and method call*)
-and check_func_call env fname el =
+(*func and method call; local_env only comes into play
+ * when a object method is called (first checked by check_field_access) *)
+and check_func_call env fname el local_env =
 		let global_func_map = !global_func_map_ref
 		in
 	let sel, env = get_sexprl env el in
@@ -394,7 +395,7 @@ and check_func_call env fname el =
 			List.map2 check_param formals sel
 	in
 	
-	let full_name = get_fully_qualified_name env.env_name fname in
+	let full_name = get_fully_qualified_name local_env.env_name fname in
 	try (
 		let the_func = StringMap.find fname reserved_map in
 		let actuals = handle_params the_func.sformals sel in
@@ -406,11 +407,12 @@ and check_func_call env fname el =
 		SCall(fname, actuals, the_func.return_typ), env)
 	with | Not_found ->
         try (
-                let cmap = try StringMap.find env.env_name env.env_class_maps
+                let cmap = try StringMap.find local_env.env_name env.env_class_maps
                 with | Not_found -> raise(Failure("Class undefined " ^ env.env_name))
                 in
                 let the_func = StringMap.find full_name cmap.class_methods in
                 let actuals = handle_params the_func.formals sel in
+                (*let actuals = SId("self", ClassTyp(env.env_name)) :: actuals in*)
                 SCall(full_name, actuals, the_func.return_typ), env)
         with | Not_found ->
             raise (Failure("Function " ^ fname ^ " not found."))
@@ -472,6 +474,11 @@ and check_field_access env obj field =
 					in
 					match_field (StringMap.find id class_map.class_fields))
 				with | Not_found -> raise(Failure("Unrecognized field")) )
+                        | MethodCall(obj, fname, el) ->
+                                let local_env =
+                                        update_env_name env class_name in
+                                ignore(raise(Failure(class_name)));
+                                check_func_call env fname el local_env
 			| FieldAccess(e1, e2) ->
 				let old_env = lhs_env in
 				let lhs, new_lhs_env = check_field lhs_env class_sid
@@ -521,6 +528,9 @@ and check_object_create env t el =
         try StringMap.find s env.env_class_maps
         with | Not_found -> raise(Failure("cannot construct undefined class object"))
     in
+    (* added self to constructor call *)
+(*    let sel = SId("self", t) :: sel
+    in*)
     (* currently don't support constructor overloading *)
     SObjCreate(t, sel), env
 
@@ -537,8 +547,8 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| FieldAccess(classid, field) -> check_field_access env classid field
-	| MethodCall(e, str, el) -> check_func_call env str el
-	| FuncCall(str, el) -> check_func_call env str el
+	| MethodCall(e, str, el) -> check_func_call env str el env
+	| FuncCall(str, el) -> check_func_call env str el env
 	| ObjCreate(t, el) -> check_object_create env t el
 	| Self -> SId("self", ClassTyp(env.env_name)), env
 (*			  | Super*)
@@ -887,7 +897,7 @@ let get_constructor_from_fdecl cname fdecl env =
 	{
 		stype = class_typ;
 		sfname = get_fully_qualified_name cname fdecl.fname;
-		sformals = Formal(class_typ, "self") :: fdecl.formals;
+		sformals =(* Formal(class_typ, "self") ::*) fdecl.formals;
 		sbody = init_self @ func_sbody @ [SReturn(SId("self", class_typ), class_typ)];
 	}
 
@@ -966,7 +976,7 @@ let get_sast class_maps reserved cdecls fdecls  =
             try let _ = List.find is_func_constructor scmethods
             in
             scmethods
-            (* only when a class called Main it does not need to have constructor *)
+            (* only when a class called Main it does not need to have constructor, or we can get rid of the check entirely *)
             with | Not_found -> if cons_name = "Main" then scmethods else raise(Failure("This class has no constructor"))
         in
 	let check_and_convert_cdecl cdecl =
