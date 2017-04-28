@@ -368,9 +368,12 @@ and check_assign env expr1 expr2 =
 		| _ -> raise(Failure("Invalid assignment: " ^
 			string_of_expr expr1 ^ " = " ^ string_of_expr expr2))
 
-(*func and method call; local_env only comes into play
- * when a object method is called (first checked by check_field_access) *)
-and check_func_call env fname el local_env =
+(*func and method call; obj_id used to know the context *)
+and check_func_call env fname el obj_id =
+    let (local_context, local_context_typ) = if obj_id = "" then ("", Null_t) else 
+        let obj_typ = get_id_typ env obj_id in
+        (string_of_typ obj_typ, obj_typ)
+    in
 		let global_func_map = !global_func_map_ref
 		in
 	let sel, env = get_sexprl env el in
@@ -395,7 +398,7 @@ and check_func_call env fname el local_env =
 			List.map2 check_param formals sel
 	in
 	
-	let full_name = get_fully_qualified_name local_env.env_name fname in
+	let full_name = get_fully_qualified_name local_context fname in
 	try (
 		let the_func = StringMap.find fname reserved_map in
 		let actuals = handle_params the_func.sformals sel in
@@ -407,12 +410,12 @@ and check_func_call env fname el local_env =
 		SCall(fname, actuals, the_func.return_typ), env)
 	with | Not_found ->
         try (
-                let cmap = try StringMap.find local_env.env_name env.env_class_maps
-                with | Not_found -> raise(Failure("Class undefined " ^ env.env_name))
+                let cmap = try StringMap.find local_context env.env_class_maps
+                with | Not_found -> raise(Failure("Class undefined " ^ local_context))
                 in
                 let the_func = StringMap.find full_name cmap.class_methods in
                 let actuals = handle_params the_func.formals sel in
-                (*let actuals = SId("self", ClassTyp(env.env_name)) :: actuals in*)
+(*                let actuals = SId(obj_id, local_context_typ) :: actuals in*)
                 SCall(full_name, actuals, the_func.return_typ), env)
         with | Not_found ->
             raise (Failure("Function " ^ fname ^ " not found."))
@@ -478,7 +481,7 @@ and check_field_access env obj field =
                                 let local_env =
                                         update_env_name env class_name in
                                 ignore(raise(Failure(class_name)));
-                                check_func_call env fname el local_env
+                                check_func_call env fname el class_name
 			| FieldAccess(e1, e2) ->
 				let old_env = lhs_env in
 				let lhs, new_lhs_env = check_field lhs_env class_sid
@@ -547,9 +550,10 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| FieldAccess(classid, field) -> check_field_access env classid field
-	| MethodCall(e, str, el) -> check_func_call env str el env
-	| FuncCall(str, el) -> check_func_call env str el env
-	| ObjCreate(t, el) -> check_object_create env t el
+        | MethodCall(e, str, el) -> check_func_call env str el (string_of_expr e)
+        (* does not work on class whose field is a class e.g. a.b.method(), should be fixable by recursively processing e in check_func_call *)
+	| FuncCall(str, el) -> check_func_call env str el ""
+        | ObjCreate(t, el) -> check_object_create env t el
 	| Self -> SId("self", ClassTyp(env.env_name)), env
 (*			  | Super*)
 	| Noexpr -> SNoexpr, env
