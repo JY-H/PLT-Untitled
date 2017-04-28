@@ -568,14 +568,6 @@ and local_var_gen llbuilder typ id sexpr =
 				SNoexpr -> alloc
 				| _ -> assign_gen llbuilder lhs sexpr typ
 
-(*and setup_self llbuilder class_name =
-	let typ = Hash.find global_classes class_name in
-	let alloc = L.build_malloc typ (class_name ^ "_this")
-		llbuilder in
-
-	ignore(Hash.add class_self class_name alloc);
-	alloc*)
-
 (* Declare all built-in functions. This should match the functions added in
  * semant.ml
  *)
@@ -651,7 +643,6 @@ let vtbl_gen scdecls =
 
 let translate sprogram =
 	let _ = construct_library_functions in
-	(* I WANNA PRINT HERE Hash.iter (fun k v-> print_string k) global_classes; *)
         let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) sprogram.classes else [] in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in

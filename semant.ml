@@ -148,7 +148,7 @@ let reserved_map = List.fold_left (
 
 (* global functions, main and constructors retain their original names
  * constructors retain their names because they are only the methods that
- * can be called outside the class (i.e. env_name = "") w/out obj.method...; janky, but we really should have parsed constructors and methods separately *)
+ * can be called outside the class (i.e. env_name = "") w/out obj.method...*)
 let get_fully_qualified_name class_name fname = match fname with
 	  "main" -> "main"
 	| _ ->	if (class_name = "" || class_name = fname) then fname else class_name ^ "." ^ fname
@@ -375,7 +375,7 @@ and check_method_call env e fname el =
         | _ -> raise(Failure("unsupported chained call")) in (* later can process recursively for a.b.call() *)
     check_func_call env fname el obj_id
 
-(*func and method call; obj_id used to distinguish *)
+(* func and method call; obj_id used to distinguish: if funcCall, obj_id = "", if methodCall, obj_id = id of that obj *)
 and check_func_call env fname el obj_id =
     let (local_context, local_context_typ) = if obj_id = "" then ("", Null_t) else 
         let obj_typ = get_id_typ env obj_id in
@@ -422,7 +422,6 @@ and check_func_call env fname el obj_id =
                 in
                 let the_func = StringMap.find full_name cmap.class_methods in
                 let actuals = handle_params the_func.formals sel in
-(*                let actuals = SId(obj_id, local_context_typ) :: actuals in*)
                 SMethodCall(SId(obj_id, local_context_typ), full_name, actuals, the_func.return_typ), env)
         with | Not_found ->
             raise (Failure("Function " ^ fname ^ " not found."))
@@ -502,29 +501,6 @@ and check_field_access env obj field =
 	let sexpr2, _ = check_field obj_env typ env field in
 	let field_type = get_type_from_sexpr sexpr2 in
 	SFieldAccess(sexpr1, sexpr2, field_type), env
-		(* Must be a class and id
-		let check_field class_sid expr =
-			match class_sid, expr with
-			SId(classname, _), Id(id) ->
-				let class_map = StringMap.find classname env.env_class_maps in
-				if StringMap.mem id class_map.class_fields then
-					let field = StringMap.find id class_map.class_fields in
-					match field with
-						ObjVar(ftyp, id, _) | ObjConst(ftyp, id, _) ->
-							SId(id, ftyp)
-				else
-					raise(Failure("Unrecognized field in class " ^
-					classname))
-			| _ -> raise(Failure("Unrecognized data type") )
-	in
-	let field_expr = match field with
-		  Id(id) -> Id(id)
-		| _ -> raise(Failure("Field must be an id"))
-	in
-	let class_sid, _ = get_sexpr env obj in
-	let field_sid = check_field class_sid field_expr in
-	let field_type = get_type_from_sexpr field_sid in
-	SFieldAccess(class_sid, field_sid, field_type), env*)
 
 and check_object_create env t el =
     let s = string_of_typ t in
@@ -533,10 +509,7 @@ and check_object_create env t el =
         try StringMap.find s env.env_class_maps
         with | Not_found -> raise(Failure("cannot construct undefined class object"))
     in
-    (* added self to constructor call *)
-(*    let sel = SId("self", t) :: sel
-    in*)
-    (* currently don't support constructor overloading *)
+    (* don't support constructor overloading *)
     SObjCreate(t, sel), env
 
 and get_sexpr env expr = match expr with
@@ -553,7 +526,7 @@ and get_sexpr env expr = match expr with
 	| Cast(t, e) -> check_cast env t e
 	| FieldAccess(classid, field) -> check_field_access env classid field
         | MethodCall(e, str, el) -> check_method_call env e str el
-        (* does not work on class whose field is a class e.g. a.b.method(), should be fixable by recursively processing e in check_func_call *)
+        (* does not work on class whose field is a class e.g. a.b.method(), fixable by recursively processing e in check_func_call *)
 	| FuncCall(str, el) -> check_func_call env str el ""
         | ObjCreate(t, el) -> check_object_create env t el
 	| Self -> SId("self", ClassTyp(env.env_name)), env
@@ -885,7 +858,7 @@ let get_constructor_from_fdecl cname fdecl env =
     let class_typ = ClassTyp(cname) in
     let init_self = [SLocalVar(class_typ, "self",
         SCall("cast", 
-            [SCall("malloc", [SIntLit(13)], CharArray(13))], (*13 should be sizeof*)
+            [SCall("malloc", [SIntLit(100)], CharArray(100))], (*100 dummy, should be sizeof*)
             class_typ))]
     in
     let env = {
@@ -898,29 +871,20 @@ let get_constructor_from_fdecl cname fdecl env =
 		env_class_maps = env.env_class_maps;
 		env_blocks = [];
      } in
-	(* does not check return: append later *)
+	(* does not check return statement: append return in the end *)
 	let func_sbody, _ = get_sstmtl env fdecl.body in
 	{
 		stype = class_typ;
 		sfname = get_fully_qualified_name cname fdecl.fname;
-		sformals =(* Formal(class_typ, "self") ::*) fdecl.formals;
+		sformals = fdecl.formals;
 		sbody = init_self @ func_sbody @ [SReturn(SId("self", class_typ), class_typ)];
 	}
 
-(*
-let get_default_constructor cname = {
-    stype = Null_t;
-    sfname = cname;
-    sformals = [Formal(ClassTyp(cname), "self")];
-    sbody = [SReturn(SNull, Null_t)];
-}
-*)
-
-(* convert fdecl to sfdecl, constructors handled separately *)
+(* convert fdecl to sfdecl, constructors handled separately by get_constructor_from_decl *)
 let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
         let is_global = (cname = "")
         in
-        (* only add self if this function is not global or not main() in a class*)
+        (* global, main() in a class (and oonstructor) do not append self to fdecl *)
         let class_formal = Formal(ClassTyp(cname), "self")
         in
 	let get_params_map map formal = match formal with
@@ -971,7 +935,6 @@ let get_sast class_maps reserved cdecls fdecls  =
 			raise (Failure("More than 1 main function defined."))
                 else List.hd all_main_decls
 	in
-        (* later need to deal with overloading constructave a default currently useless constructor, later may initialize everything to 0, etc. *)
         let find_constructor scdecl =
             let cons_name = scdecl.scname
             in
@@ -982,7 +945,7 @@ let get_sast class_maps reserved cdecls fdecls  =
             try let _ = List.find is_func_constructor scmethods
             in
             scmethods
-            (* only when a class called Main it does not need to have constructor, or we can get rid of the check entirely *)
+            (* only when a class called Main it does not need to have constructor, or if this is too janky we can get rid of the check entirely *)
             with | Not_found -> if cons_name = "Main" then scmethods else raise(Failure("This class has no constructor"))
         in
 	let check_and_convert_cdecl cdecl =
