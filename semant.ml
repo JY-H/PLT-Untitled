@@ -199,19 +199,40 @@ let get_class_maps cdecls reserved_map =
 		in
 		(* Map class names. *)
 		(
+		let sclass_name = match cdecl.sclass with
+			None -> ""
+			| Some str -> str
+		in
 		if (StringMap.mem cdecl.cname map) then
 			raise (Failure(" duplicate class name: " ^ cdecl.cname))
-		else
-			StringMap.add cdecl.cname
-			{
-				class_fields = List.fold_left map_fields StringMap.empty
-					cdecl.cbody.fields;
-				class_methods = List.fold_left map_functions StringMap.empty
-					cdecl.cbody.methods;
-				class_reserved_methods = reserved_map;
-				class_decl = cdecl;
-			} map
+		else if (sclass_name <> "" && not (StringMap.mem sclass_name map)) then
+			raise (Failure("superclass " ^ sclass_name ^ "doesn't exist"))
+		else (
+			if (sclass_name <> "") then (
+				let superclass = StringMap.find sclass_name map in
+				StringMap.add cdecl.cname
+				{
+					class_fields = List.fold_left map_fields
+						superclass.class_fields cdecl.cbody.fields;
+					class_methods = List.fold_left map_functions
+						superclass.class_methods cdecl.cbody.methods;
+					class_reserved_methods = reserved_map;
+					class_decl = cdecl;
+				} map
+			)
+			else (
+				StringMap.add cdecl.cname
+				{
+					class_fields = List.fold_left map_fields
+						StringMap.empty cdecl.cbody.fields;
+					class_methods = List.fold_left map_functions
+						StringMap.empty cdecl.cbody.methods;
+					class_reserved_methods = reserved_map;
+					class_decl = cdecl;
+				} map
+			)
 		)
+	)
 	in List.fold_left map_class StringMap.empty cdecls
 
 let get_scdecl_from_cdecl sfdecls cdecl =
