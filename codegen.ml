@@ -124,8 +124,8 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	let lexpr2 = sexpr_gen llbuilder sexpr2 in
 
 	(* KILL_ME: kill this if unused by end of project *)
-	(*let typ1 = get_type_from_sexpr sexpr1 in
-	let typ2 = get_type_from_sexpr sexpr2 in*)
+	let typ1 = get_type_from_sexpr sexpr1 in
+	let typ2 = get_type_from_sexpr sexpr2 in
 
 	let int_ops expr1 binop expr2 = match binop with
 		  A.Add -> L.build_add expr1 expr2 "int_addtmp" llbuilder
@@ -162,8 +162,13 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	(* TODO: do something for req/rneq here *)
 	
 	match typ with
-		  A.Int | A.Bool -> int_ops lexpr1 op lexpr2
+		  A.Int -> int_ops lexpr1 op lexpr2
 		| A.Float -> float_ops lexpr1 op lexpr2
+		| A.Bool -> match typ1, typ2 with
+			A.Int, A.Int | A.Bool, A.Bool -> int_ops lexpr1 op lexpr2
+			| A.Float, A.Float -> float_ops lexpr1 op lexpr2
+			| _, _ -> raise(Failure("Cannot perform operations on types "
+				^ A.string_of_typ typ1 ^ " and " ^ A.string_of_typ typ2))
 		| _ -> raise(Failure("Unrecognized data type in binop"))
 
 and unop_gen llbuilder unop sexpr typ =
