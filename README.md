@@ -23,9 +23,10 @@ make
 ### TODO
 Every pull request should come with a test case to prove that the newly implemented functionality fully works.
 
-#### Apr.1st: get everything you can do in main (aka everything you can do in C) done
-* priority:
-* objects
+#### Coding TODOs:
+* object inheritance
+* list
+* exceptions, basic features such as real print and I/O (if we still want to do RPSLK)
 
 #### TESTING TODOs:
 * Remember to add additional testing scripts if you implement a new functionality.
