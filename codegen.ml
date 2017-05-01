@@ -292,7 +292,10 @@ and field_access_gen llbuilder id rhs typ isAssign =
         match rhs with
         SId(s, d) ->
             let field_name = (class_name ^ "." ^ s) in
+			(*print_int 1;
+			print_string (field_name ^ "\n");*)
             let field_index = Hash.find class_fields field_name in
+			(*print_int 2;*)
             let _val = L.build_struct_gep par_exp field_index s llbuilder in
             let _val = match d with
                 A.ClassTyp(_) -> if isAssign then L.build_load _val s llbuilder else _val
@@ -622,7 +625,9 @@ let class_gen s =
         let typ = L.named_struct_type context s.scname in
         Hash.add global_classes s.scname typ;
 
+	(*print_int 3;*)
 	let typ = Hash.find global_classes s.scname in
+	(*print_int 4;*)
 	let typ_lst = List.map (function
 		A.ObjVar(t, _, _) | A.ObjConst(t, _, _) ->
 			get_llvm_type t) s.scbody.sfields in
@@ -633,6 +638,7 @@ let class_gen s =
 	let typ_array = (Array.of_list typ_lst) in
 		List.iteri (fun i name ->
 			let full_name = s.scname ^ "." ^ name in
+			(*print_string ("Fieldname: " ^ full_name ^ "\n");*)
 			Hash.add class_fields full_name i;
 		) name_lst;
         L.struct_set_body typ typ_array true;

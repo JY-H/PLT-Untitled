@@ -26,9 +26,8 @@ class Student extends Person {
 	}
 
 	talk() -> void {
-		print(name);
+		print(self.name);
 		print(" (Student #");
-		print(<string> id);
 		print(" says hello!\n");
 		return;
 	}

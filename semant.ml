@@ -207,8 +207,7 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 			raise (Failure(" duplicate class name: " ^ cdecl.cname))
 		else if (sclass_name <> "" && not (StringMap.mem sclass_name map)) then
 			raise (Failure("superclass " ^ sclass_name ^ " doesn't exist"))
-		else (
-			if(sclass_name <> "") then (
+		else if (sclass_name <> "") then (
 				let superclass = StringMap.find sclass_name map in
 				StringMap.add cdecl.cname
 				{
@@ -219,8 +218,8 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 					class_reserved_methods = reserved_map;
 					class_decl = cdecl;
 				} map
-			)
-			else (
+		)
+		else (
 				StringMap.add cdecl.cname
 				{
 					class_fields = List.fold_left map_fields
@@ -230,7 +229,6 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 					class_reserved_methods = reserved_map;
 					class_decl = cdecl;
 				} map
-			)
 		)
 	in List.fold_left map_class StringMap.empty cdecls
 		(*else if (sclass_name <> "" && is_child && not (StringMap.mem sclass_name map)) then
@@ -252,14 +250,23 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 	let tmp = List.fold_left map_class false StringMap.empty cdecls in
 	List.fold_left map_class true tmp dependent_list *)
 		
-let get_scdecl_from_cdecl sfdecls cdecl =
-{
-	scname = cdecl.cname;
-	scbody = {
-		sfields = cdecl.cbody.fields;
-		smethods = sfdecls;
+let get_scdecl_from_cdecl class_maps sfdecls cdecl =
+	(*List.iter (fun elem ->
+		print_string (cdecl.cname ^ " " ^ string_of_field elem)
+	) cdecl.cbody.fields;*)
+
+	let class_map = StringMap.find cdecl.cname class_maps in
+	let field_list = StringMap.fold (fun k v lst ->
+		v :: lst
+	) class_map.class_fields []
+	in
+	{
+		scname = cdecl.cname;
+		scbody = {
+			sfields = field_list;
+			smethods = sfdecls;
+		}
 	}
-}
 
 let get_type_from_sexpr = function
 	  SIntLit(_) -> Int
@@ -990,7 +997,7 @@ let get_sast class_maps reserved cdecls fdecls  =
 	        let sfunc_lst = List.fold_left (fun ls f ->
 		(get_sfdecl_from_fdecl class_maps reserved cdecl.cname f) ::
 			ls) [] cdecl.cbody.methods in
-		let scdecl = get_scdecl_from_cdecl sfunc_lst cdecl in
+		let scdecl = get_scdecl_from_cdecl class_maps sfunc_lst cdecl in
                 let _ = find_constructor scdecl in
 		(scdecl, sfunc_lst)
 	in
@@ -1019,5 +1026,12 @@ let check program = match program with
 		let global_func_map = get_global_func_map globals.fdecls reserved_map
 		in global_func_map_ref := global_func_map;
 		let class_maps = get_class_maps globals.cdecls reserved_map in
+		(*StringMap.iter (fun k v -> (
+			ignore(StringMap.iter (fun key _val ->
+				print_string (k ^ " " ^ string_of_field _val)
+			) v.class_fields)
+			)
+		) class_maps;
+		print_string "\n\n";*)
 		let sast = get_sast class_maps reserved_list globals.cdecls globals.fdecls in
                 sast
