@@ -22,7 +22,6 @@ class Game {
 			print("No game");
 		}
 		print(" is worth more.\n");
-		return;
 	}
 }
 

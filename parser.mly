@@ -42,12 +42,12 @@ global_decls:
 	  /* nothing */ { {
 		cdecls = [];
 		fdecls = []	} }
-	| global_decls cdecl	{ { 
-		cdecls = $2 :: $1.cdecls;
-		fdecls = $1.fdecls	} }
-	| global_decls fdecl	{ {
-		cdecls = $1.cdecls;
-		fdecls = $2 :: $1.fdecls } }
+	| cdecl global_decls	{ { 
+		cdecls = $1 :: $2.cdecls;
+		fdecls = $2.fdecls	} }
+	| fdecl global_decls	{ {
+		cdecls = $2.cdecls;
+		fdecls = $1 :: $2.fdecls } }
 
 cdecl:
 	/* TODO: possibly don't do interfaces because they'll be difficult */

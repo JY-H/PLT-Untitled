@@ -8,7 +8,7 @@ class Person {
 	}
 
 	talk() -> void {
-		print(name);
+		print(self.name);
 		print(" says hello!\n");
 		return;
 	}

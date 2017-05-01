@@ -614,9 +614,9 @@ let func_body_gen sfdecl =
 	(* Stack of loop blocks *)
 	let loop_stack = [] in
 	let _ = sstmt_gen llbuilder loop_stack (SBlock(sfdecl.sbody)) in
-	ignore(L.build_unreachable llbuilder);
-		if sfdecl.stype = A.Void then ignore(L.build_ret_void llbuilder);
-		()
+		if sfdecl.stype = A.Void then
+			ignore(L.build_ret_void llbuilder);
+		ignore(L.build_unreachable llbuilder)
 
 let class_gen s =
         let typ = L.named_struct_type context s.scname in

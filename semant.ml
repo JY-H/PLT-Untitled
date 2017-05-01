@@ -170,8 +170,8 @@ let get_global_func_map fdecls reserved_map =
 (* Pull all class internals into a map, including declaration, functions, and
  * fields.
  *)
-let get_class_maps is_child cdecls reserved_map =
-	let dependent_list = [] in
+let get_class_maps (*is_child*) cdecls reserved_map =
+	(*let dependent_list = [] in*)
 	let map_class map cdecl =
 		(* Map all fields, const and non-const. *)
 		let map_fields map = function
@@ -201,24 +201,42 @@ let get_class_maps is_child cdecls reserved_map =
 		(* Map class names. *)
 		let sclass_name = match cdecl.sclass with
 			None -> ""
-			| Some str -> ignore (cdecl :: dependent_list); str
+			| Some str -> str
 		in
 		if (StringMap.mem cdecl.cname map) then
 			raise (Failure(" duplicate class name: " ^ cdecl.cname))
-		else if (sclass_name == "") then (
-			StringMap.add cdecl.cname
-			{
-				class_fields = List.fold_left map_fields
-					StringMap.empty cdecl.cbody.fields;
-				class_methods = List.fold_left map_functions
-					StringMap.empty cdecl.cbody.methods;
-				class_reserved_methods = reserved_map;
-				class_decl = cdecl;
-			} map
+		else if (sclass_name <> "" && not (StringMap.mem sclass_name map)) then
+			raise (Failure("superclass " ^ sclass_name ^ " doesn't exist"))
+		else (
+			if(sclass_name <> "") then (
+				let superclass = StringMap.find sclass_name map in
+				StringMap.add cdecl.cname
+				{
+					class_fields = List.fold_left map_fields
+						superclass.class_fields cdecl.cbody.fields;
+					class_methods = List.fold_left map_functions
+						superclass.class_methods cdecl.cbody.methods;
+					class_reserved_methods = reserved_map;
+					class_decl = cdecl;
+				} map
+			)
+			else (
+				StringMap.add cdecl.cname
+				{
+					class_fields = List.fold_left map_fields
+						StringMap.empty cdecl.cbody.fields;
+					class_methods = List.fold_left map_functions
+						StringMap.empty cdecl.cbody.methods;
+					class_reserved_methods = reserved_map;
+					class_decl = cdecl;
+				} map
+			)
 		)
-		else if (sclass_name <> "" && is_child && not (StringMap.mem sclass_name map)) then
+	in List.fold_left map_class StringMap.empty cdecls
+		(*else if (sclass_name <> "" && is_child && not (StringMap.mem sclass_name map)) then
 			raise (Failure("superclass " ^ sclass_name ^ " doesn't exist"))
 		else if (sclass_name <> "" && is_child) then (
+		else (
 			let superclass = StringMap.find sclass_name map in
 			StringMap.add cdecl.cname
 			{
@@ -232,7 +250,7 @@ let get_class_maps is_child cdecls reserved_map =
 		)
 	in	
 	let tmp = List.fold_left map_class false StringMap.empty cdecls in
-	List.fold_left map_class true tmp dependent_list
+	List.fold_left map_class true tmp dependent_list *)
 		
 let get_scdecl_from_cdecl sfdecls cdecl =
 {
