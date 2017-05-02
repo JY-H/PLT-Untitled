@@ -7,8 +7,8 @@ type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 
 type uop = Neg | Not | Remove
 
-type typ = Int | Float | Bool | Char | String | Void | Null_t |
-	Tuple of typ | Lst of typ | Obj of string
+type typ = Int | Float | Bool | Char | String | Void | Null_t | Any |
+	Tuple of typ | Lst of typ | ClassTyp of string | CharArray of int
 
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
@@ -27,7 +27,7 @@ type expr =
 	| Unop of uop * expr
 	| Assign of expr * expr
 	| Cast of typ * expr
-	| FieldAccess of expr * string
+	| FieldAccess of expr * expr
 	| LstCreate of expr list
 	| TupleCreate of expr list
 	| SeqAccess of expr * expr * expr
@@ -95,7 +95,8 @@ let rec string_of_typ = function
 	| Char -> "char"
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
 	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
-	| Obj(id) -> id
+	| ClassTyp(id) -> id
+        | CharArray(n) -> "array of length " ^ string_of_int n
 
 let string_of_op = function
 	  Add -> "+"
@@ -138,7 +139,7 @@ let rec string_of_expr = function
 	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
 	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
 	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
-	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ field
+	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ string_of_expr field
 	| LstCreate(elems) ->
 		"[" ^ String.concat ", " (List.map string_of_expr elems) ^ "]"
 	| TupleCreate(elems) ->

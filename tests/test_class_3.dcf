@@ -1,0 +1,42 @@
+class Person {
+	string name;
+	int age;
+
+	Person(string n, int a) -> Person {
+		self.name = n;
+		self.age = a;
+	}
+
+	talk() -> void {
+		print(self.name);
+		print(" says hello!\n");
+		return;
+	}
+}
+
+class Student extends Person {
+	float gpa;
+	int id;
+
+	Student(string n, int a, float g, int i) -> Student {
+		self.name = n;
+		self.age = a;
+		self.gpa = g;
+		self.id = i;
+	}
+
+	talk() -> void {
+		print(self.name);
+		print(" (Student #");
+		print(" says hello!\n");
+		return;
+	}
+}
+
+main() -> int {
+	Person a = Person("Andy", 34);
+	Student b = Student("Grace", 20, 3.3, 54321);
+	a.talk();
+	b.talk();
+	return 0;
+}

@@ -1,0 +1,17 @@
+main() -> int {
+	if (false) {
+		return 0;
+	}
+	elseif (true) {
+		if (false) {
+			return 0;
+		}
+		elseif (false) {
+			return 0;
+		}
+		// Missing an else here to guarantee return
+	}
+	else {
+		return 0;
+	}
+}
