@@ -12,6 +12,7 @@ type sexpr =
     | SUnop of uop * sexpr * typ
     | SAssign of sexpr * sexpr * typ
     | SCast of typ * sexpr
+	| SLstCreate of sexpr list * typ
     | SFieldAccess of sexpr * sexpr * typ
     | SCall of string * sexpr list * typ
     | SMethodCall of sexpr * string * sexpr list * typ (* currently first is SId(obj, obj_typ), last typ is return_typ; to support chained obj method calls like a.b.hello() sexpr should be generalized in semant.ml *)

@@ -49,9 +49,10 @@ let rec get_llvm_type = function
 	| A.Char -> i8_t
 	| A.Void -> void_t
 	| A.String -> str_t
-        | A.Null_t -> i32_t
+	| A.Null_t -> i32_t
 	(* TODO: Add tuple/list types *)
-        | A.ClassTyp(name) -> L.pointer_type(find_global_class name)
+	| A.Lst(typ) -> L.pointer_type (get_llvm_type typ)
+	| A.ClassTyp(name) -> L.pointer_type(find_global_class name)
 	| _ -> raise(Failure("Type not yet supported."))
 
 and find_global_class name =
@@ -104,19 +105,19 @@ and sexpr_gen llbuilder = function
 	| SCharLit(c) -> L.const_int i8_t (Char.code c)
 	| SFloatLit(f) -> L.const_float f_t f
 	| SStringLit(s) -> string_gen llbuilder s
-		| SId(id, _) -> id_gen llbuilder id true
-		| SNull -> L.const_null i32_t
+	| SId(id, _) -> id_gen llbuilder id true
+	| SNull -> L.const_null i32_t
 	| SBinop(sexpr1, op, sexpr2, typ) ->
 		binop_gen llbuilder sexpr1 op sexpr2 typ
 	| SUnop(op, sexpr, typ) ->
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
-        | SFieldAccess(c, rhs, typ) -> field_access_gen llbuilder c rhs typ true
+	| SFieldAccess(c, rhs, typ) -> field_access_gen llbuilder c rhs typ true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
-        | SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
-        | SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
-		| SNoexpr -> L.const_int i32_t 0
+	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
+	| SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
+	| SNoexpr -> L.const_int i32_t 0
 	| _ -> raise(Failure("Expression type not recognized.")) 
 
 and binop_gen llbuilder sexpr1 op sexpr2 typ =

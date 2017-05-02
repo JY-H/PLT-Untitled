@@ -278,8 +278,9 @@ let get_type_from_sexpr = function
 	| SAssign(_, _, t) -> t
 	| SCast(t, _) -> t
 	| SFieldAccess(_, _, t) -> t
+	| SLstCreate(_, t) -> t
 	| SCall(_, _, t) -> t
-        | SMethodCall(_, _, _, t) -> t
+	| SMethodCall(_, _, _, t) -> t
 	| SObjCreate(t, _) -> t
 	| SNoexpr -> Void
 
@@ -372,6 +373,28 @@ and check_unop env op expr =
 		| _ -> raise(Failure("Unop can only be applied to numeric or boolean" ^
 			"types"))
 
+(* List assignment helpers *)
+(* Returns true if it is a list type *)
+and is_list typ = match typ with
+	  Lst(_) -> true
+	| _ -> false
+(* Returns true if it is an untyped list; false otherwise *)
+and is_untyped_list typ = match typ with
+	  Lst(Void) -> true
+	| Lst(inner_typ) -> is_untyped_list inner_typ
+	| _ -> false
+
+(* Returns the level of nesting in the list *)
+and get_nesting_level typ = match typ with
+	  Lst(inner_typ) -> 1 + get_nesting_level inner_typ
+	| _ -> 0
+
+(* Check if the lhs is a list being assigned an empty list *)
+and valid_untyped_list_assign typ1 typ2 =
+	is_list typ1 &&
+	is_untyped_list typ2 &&
+	get_nesting_level typ2 <= get_nesting_level typ1
+
 (* Check assignment, returns SAssign on success *)
 and check_assign env expr1 expr2 =
 	let sexpr1, env  = get_sexpr env expr1 in
@@ -380,9 +403,9 @@ and check_assign env expr1 expr2 =
 	let typ1 = get_type_from_sexpr sexpr1 in
 	let typ2 = get_type_from_sexpr sexpr2 in
 
-        match (typ1, sexpr2) with
-                 ClassTyp(_), SNull -> SAssign(sexpr1, sexpr2, typ1), env
-                | _ ->
+	match (typ1, sexpr2) with
+		  ClassTyp(_), SNull -> SAssign(sexpr1, sexpr2, typ1), env
+		| _ ->
 	(* Only allow assignment lhs to be id or object field *)
 	match sexpr1 with
 		  SId(id, _) ->
@@ -391,6 +414,20 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
+			(* Check if rhs is empty list and nesting level works *)
+			else if is_list typ1 && is_untyped_list typ2 &&
+				get_nesting_level typ2 <= get_nesting_level typ1 then
+				(* Change untyped list to typed list *)
+				let typed_list = match sexpr2 with
+					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
+					| _ -> raise(Failure("Cannot assign " ^
+						(string_of_typ typ2) ^ " to " ^
+						(string_of_typ typ1) ^ "\n"))
+				in
+				let list_typ = get_type_from_sexpr typed_list in
+				(* KILL_ME: debug print to check list retyping *)
+				(*print_string (string_of_typ list_typ ^ "\n");*)
+				SAssign(sexpr1, typed_list, typ1), env
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
@@ -405,6 +442,7 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
+			(* Check if empty list *)
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
@@ -494,6 +532,39 @@ and check_cast env to_typ expr =
 	in
 	scast, env
 
+(* Check list creation *)
+and check_lst_create env exprs =
+	(* Convert list of exprs to list of sexprs *)
+	let sexprs = List.map
+		(fun expr -> fst (get_sexpr env expr)) exprs in
+
+	(* Check that the types of all sexprs match *)
+	let rec check_elem_types sexprs = match sexprs with
+		  [] -> ()
+		| [_] -> ()
+		(* Has >1 elem, check all elems match *)
+		| head :: next :: tail ->
+			let typ1 = get_type_from_sexpr head in
+			let typ2 = get_type_from_sexpr next in
+			if typ1 <> typ2 then (
+				(* Type-mismatched elems found *)
+				raise(Failure("Mismatched types found in list")))
+			else
+				(* Check rest of list *)
+				check_elem_types (next :: tail)
+	in
+	check_elem_types sexprs;
+
+	(* Make list of type *)
+	if List.length sexprs > 0 then
+		(* Typed list *)
+		let typ = get_type_from_sexpr (List.hd sexprs) in
+		SLstCreate(sexprs, Lst(typ)), env
+	else
+		(* Untyped empty list *)
+		(* TODO: handle typeless lists specially *)
+		SLstCreate(sexprs, Lst(Void)), env
+
 and check_field_access env obj field =
 	(* Find class exists *)
 	let check_class_id expr = match expr with
@@ -566,11 +637,12 @@ and get_sexpr env expr = match expr with
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
+	| LstCreate(exprs) -> check_lst_create env exprs
 	| FieldAccess(classid, field) -> check_field_access env classid field
-        | MethodCall(e, str, el) -> check_method_call env e str el
-        (* does not work on class whose field is a class e.g. a.b.method(), fixable by recursively processing e in check_func_call *)
+	| MethodCall(e, str, el) -> check_method_call env e str el
+	(* does not work on class whose field is a class e.g. a.b.method(), fixable by recursively processing e in check_func_call *)
 	| FuncCall(str, el) -> check_func_call env str el ""
-        | ObjCreate(t, el) -> check_object_create env t el
+	| ObjCreate(t, el) -> check_object_create env t el
 	| Self -> SId("self", ClassTyp(env.env_name)), env
 (*			  | Super*)
 	| Noexpr -> SNoexpr, env
@@ -735,6 +807,7 @@ and check_local_var env typ id expr =
 			| _ -> add_env_block_local env id typ
 		in
 		let sexpr, env = get_sexpr env expr in
+		let sexpr_typ = get_type_from_sexpr sexpr in
 		(* If object type, check class name exists *)
 		match typ with
 			  ClassTyp(classname) ->
@@ -749,6 +822,19 @@ and check_local_var env typ id expr =
 					let typ_expr = get_type_from_sexpr sexpr in
 					if typ = typ_expr then
 						SLocalVar(typ, id, sexpr), env
+					(* Check if assigning a list an untyped list *)
+					else if valid_untyped_list_assign typ sexpr_typ then
+						let typed_list = match sexpr with
+							  SLstCreate(sexprs, _) ->
+								SLstCreate(sexprs, typ)
+							| _ -> raise(Failure("Cannot assign " ^
+								(string_of_typ sexpr_typ) ^ " to " ^
+								(string_of_typ typ) ^ "\n"))
+						in
+						let list_typ = get_type_from_sexpr typed_list in
+						(* KILL_ME: debug print to check list retyping *)
+						(*print_string (string_of_typ list_typ ^ "\n");*)
+						SLocalVar(typ, id, typed_list), env
 					else
 						raise(Failure("Declared type of " ^ id ^
 						" and assignment type " ^ (string_of_typ) typ_expr ^

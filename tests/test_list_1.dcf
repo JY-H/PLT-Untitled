@@ -1,0 +1,19 @@
+main() -> void {
+	// Basic int list
+	[int] i = [5];
+
+	// List of empty lists assigned to list of lists of ints
+	[[int]] j = [[], [], []];
+
+	// Works because assigning an empty list of lists to a list of lists
+	[[int]] k = [];
+
+	// Below won't work because assigning a 3D list to 2D list
+	//[[int]] l = [[[]]];
+
+	// List of nonempty int lists assigned to list of lists of ints
+	[[int]] m = [[0, 1], [2], [3, 4, 5, 6]];
+
+	// Below won't work because float in list of of list of ints
+	// [[int]] n = [[0, 1], [2], [3.0]];
+}
