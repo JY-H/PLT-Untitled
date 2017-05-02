@@ -20,11 +20,10 @@ make
     gcc [testfile.s]
     ```
 
-### TODO
+### NOTES
 Every pull request should come with a test case to prove that the newly implemented functionality fully works.
 
 #### Coding TODOs:
-* object inheritance
 * list
 * exceptions, basic features such as real print and I/O (if we still want to do RPSLK)
 

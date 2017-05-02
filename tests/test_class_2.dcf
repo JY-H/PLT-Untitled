@@ -1,0 +1,36 @@
+class Game {
+	string title;
+	float price;
+
+	Game(string t, float p) -> Game {
+		self.title = t;
+		self.price = p;
+	}
+
+	compare(Game other) -> void {
+		//fix once concat works
+		print("Between ");
+		print(self.title);
+		print(" and ");
+		print(other.title);
+		print(",\n");
+		if (self.price > other.price) {
+			print(self.title);
+		} elseif (self.price < other.price) {
+			print(other.title);
+		} else {
+			print("No game");
+		}
+		print(" is worth more.\n");
+	}
+}
+
+main() -> int {
+	Game chess = Game("Chess", 14.00);
+	Game checkers = Game("Checkers", 14.00);
+	Game sorry = Game("Sorry", 10.50);
+	Game pandemic = Game("Pandemic: Legacy", 40.75);
+	sorry.compare(pandemic);
+	chess.compare(checkers);
+	return 0;
+}

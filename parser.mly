@@ -42,12 +42,12 @@ global_decls:
 	  /* nothing */ { {
 		cdecls = [];
 		fdecls = []	} }
-	| global_decls cdecl	{ { 
-		cdecls = $2 :: $1.cdecls;
-		fdecls = $1.fdecls	} }
-	| global_decls fdecl	{ {
-		cdecls = $1.cdecls;
-		fdecls = $2 :: $1.fdecls } }
+	| cdecl global_decls	{ { 
+		cdecls = $1 :: $2.cdecls;
+		fdecls = $2.fdecls	} }
+	| fdecl global_decls	{ {
+		cdecls = $2.cdecls;
+		fdecls = $1 :: $2.fdecls } }
 
 cdecl:
 	/* TODO: possibly don't do interfaces because they'll be difficult */
@@ -91,6 +91,12 @@ fdecl:
 		formals = $3;
 		return_typ = $6;
 		body = List.rev $8 } }
+	| CLASSID LPAREN formals_opt RPAREN ARROW return_typ LBRACE stmt_list RBRACE
+	{ {
+		fname = $1;
+		formals = $3;
+		return_typ = $6;
+		body = List.rev $8 } }
 
 formals_opt:
 	  /* nothing */	{ [] }
@@ -124,7 +130,7 @@ tuple_typ:
 	LPAREN typ RPAREN	{ Tuple($2) }
 
 obj_typ:
-	CLASSID				{ Obj($1) }
+	CLASSID				{ ClassTyp($1) }
 
 classid_list_opt:
 	/* nothing */ { Some [] }
@@ -176,9 +182,9 @@ stmt:
 
 catch_list:
 	  CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE
-		{ [Catch(Obj($3), $4, Block(List.rev $7))] }
+		{ [Catch(ClassTyp($3), $4, Block(List.rev $7))] }
 	| CATCH LPAREN CLASSID ID RPAREN LBRACE stmt_list RBRACE catch_list
-		{ Catch(Obj($3), $4, Block(List.rev $7)) :: $9}
+		{ Catch(ClassTyp($3), $4, Block(List.rev $7)) :: $9}
 
 elseifs:
 	  ELSEIF LPAREN expr RPAREN LBRACE stmt_list RBRACE
@@ -218,7 +224,7 @@ expr:
 	| LPAREN expr RPAREN	{ $2 }
 	| sequence	{ $1 }
 	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
-	| expr DOT ID	{ FieldAccess($1, $3) }
+	| expr DOT ID	{ FieldAccess($1, Id($3)) }
 	| ID LPAREN actuals_opt RPAREN	{ FuncCall($1, $3) }
 	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
 	| obj_typ LPAREN actuals_opt RPAREN	{ ObjCreate($1, $3) }

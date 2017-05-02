@@ -1,0 +1,25 @@
+class Animal {
+	string name;
+	int legs;
+	bool tail;
+
+	Animal(string n, int l, bool t) -> Animal {
+		self.name = n;
+		self.legs = l;
+		self.tail = t;
+	}
+
+	talk() -> void {
+		print("hi");
+	}
+}
+
+main() -> int {
+	Animal cat = Animal("Amy", 3, true);
+	string old_name = cat.name;
+	print(old_name);
+	cat.name = "Bob";
+	print(cat.name);
+	cat.talk();
+	return 0;
+}

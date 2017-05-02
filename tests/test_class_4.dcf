@@ -1,0 +1,68 @@
+class Animal {
+	int num_feet;
+	string name;
+
+	Animal(int ft, string n) -> Animal {
+		self.num_feet = ft;
+		self.name = n;
+	}
+
+	summary() -> void {
+		print(self.name);
+		print(" has ");
+		print("<string> self.num_feet feet.\n");
+	}
+}
+
+class Mammal extends Animal{
+	int litter_size;
+	
+	Mammal(int ft, string n, int l) -> Mammal {
+		self.num_feet = ft;
+		self.name = n;
+		self.litter_size = l;
+	}
+
+}
+
+class Capybara extends Mammal {
+	bool cute;
+
+	Capybara(int ft, string n, int l, bool c) -> Capybara {
+		self.num_feet = ft;
+		self.name = n;
+		self.litter_size = l;
+		self.cute = c;
+	}
+
+	is_cute() -> void {
+		print(self.name);
+		print(" has blah feet and is ");
+		if (not self.cute) {
+			print("not ");
+		}
+		print("cute.\n");
+	}
+
+	compare(Capybara c2) -> int {
+		if (self.num_feet === c2.num_feet) {
+			return 0;
+		} elseif (self.num_feet > c2.num_feet) {
+			return 1;
+		} else {
+			return -1;
+		}
+	}
+}
+
+main() -> int {
+	Capybara connie = Capybara(4, "Connie", 50, false);
+	Capybara connie2 = Capybara(4, "Connie2", 50, false);
+	connie.is_cute();
+	int res = connie.compare(connie2);
+	if (res === 0) {
+		print("Connie and connie2 are equally (not) cute.\n");
+	}
+	connie.summary();
+	return 0;
+}
