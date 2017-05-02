@@ -167,9 +167,7 @@ let get_global_func_map fdecls reserved_map =
 	List.fold_left map_global_funcs StringMap.empty fdecls
 
 
-(* Pull all class internals into a map, including declaration, functions, and
- * fields.
- *)
+(* Collect all class internals into a map as class_map's *)
 let get_class_maps (*is_child*) cdecls reserved_map =
 	(*let dependent_list = [] in*)
 	let map_class map cdecl =
@@ -191,9 +189,13 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 		let map_functions map fdecl =
 			let func_full_name = get_fully_qualified_name cdecl.cname fdecl.fname
 			in
-			if (StringMap.mem func_full_name map) then
+                        (* be my guest to have duplicate functions; however, only
+                         * the last declaration is picked up. Because we parse super
+                         * super class before super class before child class, this means
+                         * that child class can overwrite ancestors' declarations *)
+			if (*(StringMap.mem func_full_name map) then
 				raise (Failure(" duplicate function: " ^ func_full_name))
-			else if (StringMap.mem fdecl.fname reserved_map) then
+			else if*) (StringMap.mem fdecl.fname reserved_map) then
 				raise (Failure(fdecl.fname ^ " is a reserved function."))
 			else
 				StringMap.add func_full_name fdecl map
@@ -203,18 +205,35 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 			None -> ""
 			| Some str -> str
 		in
+                (* life could be much easier if we can do regex and replace
+                 * key in child class maps from parent.method to child.method *)
+                let rec get_all_inherited_methods sclass_name lst =
+                    let super_cdecl = List.filter (fun cdecl -> (cdecl.cname = sclass_name)) cdecls in
+                    let super_cdecl = List.hd super_cdecl
+                    in
+                    (* remove constructor *)
+                    let inherited_methods = List.filter (fun met -> (met.fname <> sclass_name)) super_cdecl.cbody.methods
+                    in
+                    let res = inherited_methods @ lst
+                    in
+                    match super_cdecl.sclass with
+                          None -> res
+                        | Some str -> get_all_inherited_methods str res
+                in
 		if (StringMap.mem cdecl.cname map) then
 			raise (Failure(" duplicate class name: " ^ cdecl.cname))
 		else if (sclass_name <> "" && not (StringMap.mem sclass_name map)) then
 			raise (Failure("superclass " ^ sclass_name ^ " doesn't exist"))
 		else if (sclass_name <> "") then (
 				let superclass = StringMap.find sclass_name map in
+                                let all_inherited_methods = get_all_inherited_methods sclass_name []
+                                in
 				StringMap.add cdecl.cname
 				{
 					class_fields = List.fold_left map_fields
 						superclass.class_fields cdecl.cbody.fields;
 					class_methods = List.fold_left map_functions
-						superclass.class_methods cdecl.cbody.methods;
+						StringMap.empty (all_inherited_methods @ cdecl.cbody.methods);
 					class_reserved_methods = reserved_map;
 					class_decl = cdecl;
 				} map
@@ -993,10 +1012,16 @@ let get_sast class_maps reserved cdecls fdecls  =
             (* only when a class called Main it does not need to have constructor, or if this is too janky we can get rid of the check entirely *)
             with | Not_found -> if cons_name = "Main" then scmethods else raise(Failure("This class has no constructor"))
         in
+        let get_all_methods cname =
+            let class_map = StringMap.find cname class_maps in
+            let method_map = class_map.class_methods in
+            (* collect all method declarations in a list, including inherited ones *)
+            StringMap.fold (fun _ v l -> v :: l) method_map []
+        in
 	let check_and_convert_cdecl cdecl =
 	        let sfunc_lst = List.fold_left (fun ls f ->
 		(get_sfdecl_from_fdecl class_maps reserved cdecl.cname f) ::
-			ls) [] cdecl.cbody.methods in
+			ls) [] (get_all_methods cdecl.cname) in
 		let scdecl = get_scdecl_from_cdecl class_maps sfunc_lst cdecl in
                 let _ = find_constructor scdecl in
 		(scdecl, sfunc_lst)

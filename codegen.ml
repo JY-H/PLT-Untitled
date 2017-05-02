@@ -625,9 +625,7 @@ let class_gen s =
         let typ = L.named_struct_type context s.scname in
         Hash.add global_classes s.scname typ;
 
-	(*print_int 3;*)
 	let typ = Hash.find global_classes s.scname in
-	(*print_int 4;*)
 	let typ_lst = List.map (function
 		A.ObjVar(t, _, _) | A.ObjConst(t, _, _) ->
 			get_llvm_type t) s.scbody.sfields in
@@ -638,7 +636,6 @@ let class_gen s =
 	let typ_array = (Array.of_list typ_lst) in
 		List.iteri (fun i name ->
 			let full_name = s.scname ^ "." ^ name in
-			(*print_string ("Fieldname: " ^ full_name ^ "\n");*)
 			Hash.add class_fields full_name i;
 		) name_lst;
         L.struct_set_body typ typ_array true;
