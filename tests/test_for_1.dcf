@@ -1,8 +1,8 @@
 main() -> int {
 	int x;
 	for (x = 0; x < 10; x = x + 1) {
-		print("hi");
+		print_string("hi");
 	}
-	print("done");
+	print_string("done");
 	return 0;
 }

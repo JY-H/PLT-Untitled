@@ -3,7 +3,7 @@ main() -> int {
 	for (i = 0; i < 5; i = i + 1) {
 		int j;
 		for (j = 0; j < 2; j = j + 1) {
-			print("hi");
+			print_string("hi");
 		}
 	}
 	return 0;

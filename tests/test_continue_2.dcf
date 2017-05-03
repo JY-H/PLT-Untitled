@@ -3,10 +3,10 @@ main() -> int {
 	for (i = 0; i < 5; i = i + 1) {
 		int j;
 		for (j = 0; j < 5; j = j + 1) {
-			print("foo");
+			print_string("foo");
 			break;
 		}
-		print("bar");
+		print_string("bar");
 	}
 	return 0;
 }

@@ -10,16 +10,16 @@ class Animal {
 	}
 
 	talk() -> void {
-		print("hi");
+		print_string("hi");
 	}
 }
 
 main() -> int {
 	Animal cat = Animal("Amy", 3, true);
 	string old_name = cat.name;
-	print(old_name);
+	print_string(old_name);
 	cat.name = "Bob";
-	print(cat.name);
+	print_string(cat.name);
 	cat.talk();
 	return 0;
 }

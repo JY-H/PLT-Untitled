@@ -3,13 +3,13 @@ main() -> int {
 	
 	while (i < 5) {
 		string s = "hi\n";
-		print(s);
+		print_string(s);
 		i = i + 1;
 	}
 
 	while (i < 10) {
 		string s = "bye\n";
-		print(s);
+		print_string(s);
 		i = i + 1;
 	}
 	return 0;

@@ -4,7 +4,7 @@ main() -> int {
 	for (i = 0; i < 3; i = i + 1) {
 		j = 0;
 		while (j < i) {
-			print("ij\t");
+			print_string("ij\t");
 			j = j + 1;
 		}
 	}

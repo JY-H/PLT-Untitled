@@ -11,7 +11,7 @@ main() -> int {
 	int c = 49;
 	int e = 29;
 	if (gcd(a, b) === 20 and gcd(c, e) === 1) {
-		print("I can do gcd -w-\n");
+		print_string("I can do gcd -w-\n");
 	}
 	return 0;
 }

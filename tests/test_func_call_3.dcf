@@ -15,11 +15,9 @@ main() -> int {
 	int a;
 	a = exp(3, 2);
 	int b = exp(2, 4);
-	if (a === 9) {
-		print("9\n");
-	}
-	if (b === 16) {
-		print("16");
-	}
+	print_string("a: ");
+	print_int(a);
+	print_string("\tb: ");
+	print_int(b);
 	return 0;
 }

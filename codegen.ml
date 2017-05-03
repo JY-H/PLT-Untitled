@@ -363,7 +363,8 @@ and func_call_gen llbuilder fname sexprl stype =
 and call_gen llbuilder fname sexprl stype =
 		match fname with
                 (* full list of built-in and linked functions just for clarity*)
-				 "print" -> print_gen llbuilder sexprl
+				 "print_string" | "print_int" | "print_float" ->
+					print_gen llbuilder sexprl
 				| "malloc" -> func_call_gen llbuilder fname sexprl stype
 				| "cast" -> cast_malloc_gen llbuilder sexprl stype
 				| _ -> func_call_gen llbuilder fname sexprl stype
@@ -372,9 +373,20 @@ and call_gen llbuilder fname sexprl stype =
 and print_gen llbuilder sexpr_list =
 	let params = List.map (fun expr -> sexpr_gen llbuilder expr) sexpr_list
 	in
-	L.build_call (func_lookup "printf")
-		(Array.of_list ((sexpr_gen llbuilder (SStringLit("%s")))::params))
-		"print" llbuilder
+	let param_types = List.map get_type_from_sexpr sexpr_list in
+	let get_format typ = match typ with
+		  A.Int -> "%d"
+		| A.Float -> "%f"
+		| A.String -> "%s"
+		(* char ?? *)
+		| _ -> raise (Failure("cannot print type " ^ A.string_of_typ typ))
+	in
+	let format_str = List.fold_left (fun s t -> s ^ get_format t) "" param_types in
+	let str = sexpr_gen llbuilder (SStringLit(format_str)) in
+		let zero = L.const_int i32_t 0 in
+		let s = L.build_in_bounds_gep str [| zero |] "tmp" llbuilder in
+		L.build_call (func_lookup "printf")
+			(Array.of_list (s :: params)) "print" llbuilder
 
 and ret_gen llbuilder sexpr t =
 	match sexpr with

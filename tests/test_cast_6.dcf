@@ -2,24 +2,24 @@
 main() -> int {
 	int i;
 	if (not <bool>i) {
-		print("yes\n");
+		print_string("yes\n");
 	}
 
 	for (i = 1; i < 10; i = i + 1) {
 		if (not <bool>i) {
-			print("no\n");
+			print_string("no\n");
 		}
 		else {
-			print("yes\n");
+			print_string("yes\n");
 		}
 	}
 
 	for (i = -1; i > -10; i = i - 1) {
 		if (not <bool>i) {
-			print("no\n");
+			print_string("no\n");
 		}
 		else {
-			print("yes\n");
+			print_string("yes\n");
 		}
 	}
 	return 0;

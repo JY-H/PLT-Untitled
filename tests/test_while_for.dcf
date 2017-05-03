@@ -3,7 +3,7 @@ main() -> int {
 	int j;
 	while (i < 3) {
 		for (j = i; j > 0; j = j - 1) {
-			print("ij\t");
+			print_string("ij\t");
 		}
 		i = i + 1;
 	}

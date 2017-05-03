@@ -2,11 +2,11 @@ main() -> int {
 	int x = 12;
 	while (x > 9) {
 		x = minus(x);
-		print("minus\n");
+		print_string("minus\n");
 	}
 	while (x < 10) {
 		x = plus(x);
-		print("plus\n");
+		print_string("plus\n");
 	}
 	return 0;
 }

@@ -8,8 +8,8 @@ class Person {
 	}
 
 	talk() -> void {
-		print(self.name);
-		print(" says hello!\n");
+		print_string(self.name);
+		print_string(" says hello!\n");
 		return;
 	}
 }
@@ -26,9 +26,10 @@ class Student extends Person {
 	}
 
 	talk() -> void {
-		print(self.name);
-		print(" (Student #");
-		print(" says hello!\n");
+		print_string(self.name);
+		print_string(" (Student #");
+		print_int(self.id);
+		print_string(") says hello!\n");
 		return;
 	}
 }

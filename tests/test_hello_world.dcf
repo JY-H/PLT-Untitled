@@ -1,6 +1,6 @@
 class Main {
 	main() -> int {
-    		print("Hello world!");
+    		print_string("Hello world!");
     		return 0;
 	}
 }

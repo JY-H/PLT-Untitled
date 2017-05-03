@@ -132,14 +132,15 @@ let reserved_list =
         let char_t = CharArray(1) in
         let str_t = String in
         let int_t = Int in
+		let float_t = Float in
         let void_t = Void in
 	let reserved = [
-		reserved_struct "print" (Void) ([Formal(String, "string_arg")]);
-                reserved_struct "malloc" (CharArray(1)) ([Formal(Int, "size")]);
-                reserved_struct "cast" (Any) ([Formal(Any, "victim")]);
-	]
-	in
-	reserved
+		reserved_struct "print_string" (Void) ([Formal(String, "string_arg")]);
+		reserved_struct "print_int" (Void) ([Formal(Int, "int_arg")]);
+		reserved_struct "print_float" (Void) ([Formal(Float, "float_arg")]);
+		reserved_struct "malloc" (CharArray(1)) ([Formal(Int, "size")]);
+		reserved_struct "cast" (Any) ([Formal(Any, "victim")]);
+	] in reserved
 
 let reserved_map = List.fold_left (
 			fun map f -> StringMap.add f.sfname f map

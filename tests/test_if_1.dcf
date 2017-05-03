@@ -3,17 +3,17 @@ main() -> int {
 	int x;
 
 	if (false) {
-		print("foo");
+		print_string("foo");
 		x = 1;
 	}
 	elseif (true) {
-		print("bar");
+		print_string("bar");
 	}
 	elseif (false) {
-		print("bat");
+		print_string("bat");
 	}
 	else {
-		print("baz");
+		print_string("baz");
 	}
 	return 0;
 }

@@ -3,10 +3,10 @@ main() -> int {
 	while (x < 5) {
 		x = x + 1;
 		if (true) {
-			print("foo");
+			print_string("foo");
 			continue;
 		}
-		print("bar");
+		print_string("bar");
 	}
 	return 0;
 }

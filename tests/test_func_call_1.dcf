@@ -6,7 +6,7 @@ foo(int i) -> int {
 main() -> int {
 	int y = foo(1);
 	if (y === 2) {
-		print("I can do math");
+		print_string("I can do math");
 	}
 	return 0;
 }

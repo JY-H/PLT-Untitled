@@ -1,13 +1,13 @@
 main() -> int {
 	if (false) {
-		print("foo");
+		print_string("foo");
 	}
 	else {
-		print("bar");
+		print_string("bar");
 	}
 
 	if (true) {
-		print("bat");
+		print_string("bat");
 	}
 	return 0;
 }

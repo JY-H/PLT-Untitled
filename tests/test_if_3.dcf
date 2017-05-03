@@ -1,15 +1,15 @@
 main() -> int {
 	if (true) {
 		if (false) {
-			print("foo");
+			print_string("foo");
 		}
 		elseif (true) {
-			print("bar");
+			print_string("bar");
 		}
-		print("bat");
+		print_string("bat");
 	}
 	elseif (true) {
-		print("baz");
+		print_string("baz");
 	}
 	return 0;
 }

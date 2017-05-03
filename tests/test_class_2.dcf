@@ -9,19 +9,24 @@ class Game {
 
 	compare(Game other) -> void {
 		//fix once concat works
-		print("Between ");
-		print(self.title);
-		print(" and ");
-		print(other.title);
-		print(",\n");
+		print_string("Between ");
+		print_string(self.title);
+		print_string(" and ");
+		print_string(other.title);
+		print_string(",\n");
 		if (self.price > other.price) {
-			print(self.title);
+			print_string(self.title);
+			print_string(" is worth more at $");
+			print_float(self.price);
+			print_string(".\n");
 		} elseif (self.price < other.price) {
-			print(other.title);
+			print_string(other.title);
+			print_string(" is worth more at $");
+			print_float(other.price);
+			print_string(".\n");
 		} else {
-			print("No game");
+			print_string("No game is worth more.\n");
 		}
-		print(" is worth more.\n");
 	}
 }
 

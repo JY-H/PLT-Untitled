@@ -1,7 +1,7 @@
 main() -> int {
 	// legal
-	print("print me!");
+	print_string("print me!");
 	return 0;
-	print("don't print me!");
+	print_string("don't print me!");
 	int i = 5;
 }

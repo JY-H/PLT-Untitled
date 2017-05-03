@@ -8,9 +8,10 @@ class Animal {
 	}
 
 	summary() -> void {
-		print(self.name);
-		print(" has ");
-		print("<string> self.num_feet feet.\n");
+		print_string(self.name);
+		print_string(" has ");
+		print_int(self.num_feet);
+		print_string(" feet.\n");
 	}
 }
 
@@ -36,12 +37,14 @@ class Capybara extends Mammal {
 	}
 
 	is_cute() -> void {
-		print(self.name);
-		print(" has blah feet and is ");
+		print_string(self.name);
+		print_string(" has ");
+		print_int(self.num_feet);
+		print_string(" feet and is ");
 		if (not self.cute) {
-			print("not ");
+			print_string("not ");
 		}
-		print("cute.\n");
+		print_string("cute.\n");
 	}
 
 	compare(Capybara c2) -> int {
@@ -61,7 +64,7 @@ main() -> int {
 	connie.is_cute();
 	int res = connie.compare(connie2);
 	if (res === 0) {
-		print("Connie and connie2 are equally (not) cute.\n");
+		print_string("Connie and connie2 are equally (not) cute.\n");
 	}
 	connie.summary();
 	return 0;
