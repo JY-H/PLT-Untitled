@@ -12,10 +12,8 @@ http://llvm.moe/ocaml/
 
 *)
 
-(*open Llvm*)
 open Sast
 open Semant
-(*open Str*)
 
 module L = Llvm
 module A = Ast 
@@ -279,6 +277,19 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
+
+(* written only for 1D lists atm *)
+and lst_create_gen llbuilder t len =
+	let llvm_typ = get_llvm_type t in
+	let length = (sexpr_gen llbuilder (SIntLit(len))) in
+	let size_t = L.build_intcast (L.size_of llvm_typ) i32_t "tmp"
+		llbuilder in
+	let sz = L.build_mul size_t length "tmp" llbuilder in
+	let real_size = L.build_add sz (L.const_int i32_t 1) "lst_size"
+		llbuilder in
+	let lst = L.build_array_malloc llvm_typ real_size "tmp" llbuilder in
+	let lst = L.build_pointercast lst (L.pointer_type llvm_typ) "tmp"
+		llbuilder in lst
 
 and field_access_gen llbuilder id rhs typ isAssign =
     let check_id id =
@@ -574,17 +585,28 @@ and continue_gen llbuilder loop_stack =
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id sexpr =
-	let ltyp = match typ with
-          A.ClassTyp(classname) -> find_global_class classname
-	| _ -> get_llvm_type typ
+	let lst, ltyp, flag = match typ with
+          A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
+			(L.const_int i32_t 0) "nop" llbuilder),
+			find_global_class classname, false
+		| A.Lst(t) -> (lst_create_gen llbuilder t 20), get_llvm_type t, true
+		(* TODO: the 20 is a dummy size; need to count how many elements are
+		  in the list's creation expression *)
+		| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
+			"nop" llbuilder), get_llvm_type typ, false
 	in
 
 	let alloc = L.build_alloca ltyp id llbuilder in
 	Hash.add local_values id alloc;
+	if flag = false then (
 		let lhs = SId(id, typ) in
 		match sexpr with
 				SNoexpr -> alloc
-				| _ -> assign_gen llbuilder lhs sexpr typ
+				| _ -> assign_gen llbuilder lhs sexpr typ )
+	else
+		let lhs_gen = id_gen llbuilder id false in
+		ignore(L.build_store lst lhs_gen llbuilder);
+		alloc
 
 (* Declare all built-in functions. This should match the functions added in
  * semant.ml
