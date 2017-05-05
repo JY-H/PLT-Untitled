@@ -1,12 +1,12 @@
 main() -> void {
 	// Basic int list
-	[int] i = [5];
+	//[int] i = [5, 4];
 
 	// List of empty lists assigned to list of lists of ints
-	[[int]] j = [[], [], []];
+	//[[int]] j = [[], [], []];
 
 	// Works because assigning an empty list of lists to a list of lists
-	[[int]] k = [];
+	//[[int]] k = [];
 
 	// Below won't work because assigning a 3D list to 2D list
 	//[[int]] l = [[[]]];

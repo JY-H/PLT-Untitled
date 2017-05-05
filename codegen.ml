@@ -111,6 +111,7 @@ and sexpr_gen llbuilder = function
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
+        | SLstCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
 	| SFieldAccess(c, rhs, typ) -> field_access_gen llbuilder c rhs typ true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
 	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
@@ -278,18 +279,22 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
 
-(* written only for 1D lists atm *)
-and lst_create_gen llbuilder t len =
-	let llvm_typ = get_llvm_type t in
-	let length = (sexpr_gen llbuilder (SIntLit(len))) in
-	let size_t = L.build_intcast (L.size_of llvm_typ) i32_t "tmp"
+(* written only for 1D lists atm
+ * multiple dimensions may work since LstCreate is processed recursively? llvm code looks kinda promising, but we can only tell after access is implemented *)
+(* I don't think we should mul here; build_array_malloc should malloc len * sizeof(typ) it seems from llvm code generated *)
+and lst_create_gen llbuilder t sexprl =
+        let sexprl = List.rev sexprl in (* seems elements are appended in reverse? *)
+        let len = L.const_int i32_t (List.length sexprl) in
+        let len_real = L.const_int i32_t ((List.length sexprl) + 1) in
+	let typ = get_llvm_type t in
+	let lst = L.build_array_malloc typ len_real "tmp" llbuilder in
+	let lst = L.build_pointercast lst typ "tmp"
 		llbuilder in
-	let sz = L.build_mul size_t length "tmp" llbuilder in
-	let real_size = L.build_add sz (L.const_int i32_t 1) "lst_size"
-		llbuilder in
-	let lst = L.build_array_malloc llvm_typ real_size "tmp" llbuilder in
-	let lst = L.build_pointercast lst (L.pointer_type llvm_typ) "tmp"
-		llbuilder in lst
+        let llvalues = List.map (sexpr_gen llbuilder) sexprl in
+        List.iteri (fun i llval -> let ptr = L.build_gep lst [|(L.const_int i32_t (i+1))|] "tmp"
+        llbuilder in
+        ignore(L.build_store llval ptr llbuilder); ) llvalues;
+        lst
 
 and field_access_gen llbuilder id rhs typ isAssign =
     let check_id id =
@@ -589,9 +594,6 @@ and local_var_gen llbuilder typ id sexpr =
           A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
 			find_global_class classname, false
-		| A.Lst(t) -> (lst_create_gen llbuilder t 20), get_llvm_type t, true
-		(* TODO: the 20 is a dummy size; need to count how many elements are
-		  in the list's creation expression *)
 		| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
