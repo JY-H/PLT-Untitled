@@ -164,11 +164,11 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	match typ with
 		  A.Int -> int_ops lexpr1 op lexpr2
 		| A.Float -> float_ops lexpr1 op lexpr2
-		| A.Bool -> match typ1, typ2 with
+		| A.Bool -> (match typ1, typ2 with
 			A.Int, A.Int | A.Bool, A.Bool -> int_ops lexpr1 op lexpr2
 			| A.Float, A.Float -> float_ops lexpr1 op lexpr2
 			| _, _ -> raise(Failure("Cannot perform operations on types "
-				^ A.string_of_typ typ1 ^ " and " ^ A.string_of_typ typ2))
+				^ A.string_of_typ typ1 ^ " and " ^ A.string_of_typ typ2)))
 		| _ -> raise(Failure("Unrecognized data type in binop"))
 
 and unop_gen llbuilder unop sexpr typ =
@@ -297,7 +297,7 @@ and lst_create_gen llbuilder t sexprl =
 and field_access_gen llbuilder id rhs isAssign =
 	let check_id id =
 		match id with
-		 SId(s, d) -> id_gen llbuilder s false
+		 SId(s, _) -> id_gen llbuilder s false
 		(* array *)
 		| _ -> raise(Failure("expected access lhs to be an id"))
 	in
@@ -340,7 +340,6 @@ and cast_malloc_gen llbuilder sexprl stype =
 		| _ as c -> raise(Failure("RIP cannot cast to " ^ A.string_of_typ c))
 	in
 	let sexpr = List.hd sexprl in
-	let old_typ = Se.get_type_from_sexpr sexpr in
 	let lhs = match sexpr with
 		  SId(id, _) -> id_gen llbuilder id false
 		| SFieldAccess(e1, e2, _) -> field_access_gen llbuilder e1 e2 false
@@ -353,18 +352,20 @@ and method_call_gen llbuilder obj_expr fname sexprl styp =
 	SId(_, obj_typ) ->
 		let the_func = func_lookup fname in
 		let match_sexpr se = match se with
-		  SId(id, d) -> let isDeref = match d with
+			SId(id, d) -> let isDeref = match d with
 				  A.ClassTyp(_) -> false
 				| _ -> true
 		in id_gen llbuilder id isDeref
-		| se -> sexpr_gen llbuilder se
-		in
+	| se -> sexpr_gen llbuilder se in
 		let lhs = match_sexpr obj_expr in
-		let self_param = L.build_pointercast lhs (get_llvm_type obj_typ) "tmp" llbuilder in
+		let self_param = L.build_pointercast lhs
+			(get_llvm_type obj_typ) "tmp" llbuilder in
 		let params = List.map match_sexpr sexprl in
-		match styp with
-				A.Void -> L.build_call the_func (Array.of_list (self_param :: params)) "" llbuilder
-		| _ -> L.build_call the_func (Array.of_list (self_param :: params)) "tmp" llbuilder
+			(match styp with
+			A.Void -> L.build_call the_func (Array.of_list
+				(self_param :: params)) "" llbuilder
+			| _ -> L.build_call the_func (Array.of_list
+				(self_param :: params)) "tmp" llbuilder)
 	| _ -> raise(Failure("unsupported chained method call"))
 
 and func_call_gen llbuilder fname sexprl stype =

@@ -369,11 +369,10 @@ and check_unop env op expr =
 
 	let sexpr, _ = get_sexpr env expr in
 	let typ = get_type_from_sexpr sexpr in
-	match typ with
+	(match typ with
 		  Int | Float -> get_neg_op op sexpr typ, env
 		| Bool -> get_not_op op sexpr typ, env
-		| _ -> raise(Failure("Unop can only be applied to numeric or boolean" ^
-			"types"))
+		| _ -> raise(Failure("Unop can only be applied to numeric or boolean" ^	"types")))
 
 (* List assignment helpers *)
 (* Returns true if it is a list type *)
@@ -472,12 +471,13 @@ and check_func_call env fname el obj_id =
 		in
 	let sel, env = get_sexprl env el in
 	let check_param formal param =
-		let f_typ = match formal with Formal(t, _) -> t | _ -> Void in
+		let f_typ = (match formal with
+			Formal(t, _) -> t
+			| _ -> Void) in
 		let p_typ = get_type_from_sexpr param in
 		if (f_typ = p_typ) then param
-		else
-			raise(Failure("Incorrect type passed to function"))
-			in
+		else raise(Failure("Incorrect type passed to function"))
+		in
 	let handle_params formals params =
 				match formals, params with
 						[], [] -> []
@@ -617,14 +617,14 @@ and check_field_access env obj field =
 				try (
 					let class_map = StringMap.find class_name
 						lhs_env.env_class_maps in
-					let match_field f = match f with
-						ObjVar(dt, _, _) | ObjConst(dt, _, _) ->
-							SId(id, dt), lhs_env
-						| _ -> raise(Failure("Not a variable or const"))
+					let match_field f = (match f with
+						ObjVar(dt, _, _) -> SId(id, dt), lhs_env
+						| ObjConst(dt, _, _) ->	SId(id, dt), lhs_env
+						| _ -> raise(Failure("Not a variable or const")))
 					in
 					match_field (StringMap.find id class_map.class_fields))
-				with | Not_found -> raise(Failure("Unrecognized field")) )
-                    	| FieldAccess(e1, e2) ->
+				with | Not_found -> raise(Failure("Unrecognized field")))
+			| FieldAccess(e1, e2) -> (
 				let old_env = lhs_env in
 				let lhs, new_lhs_env = check_field lhs_env class_sid
 					top_env e1 in
@@ -633,7 +633,7 @@ and check_field_access env obj field =
 					(get_class_name lhs_typ) in
 				let rhs, _ = check_field new_env lhs_typ lhs_env e2 in
 				let rhs_typ = get_type_from_sexpr rhs in
-				SFieldAccess(lhs, rhs, rhs_typ), old_env
+				SFieldAccess(lhs, rhs, rhs_typ), old_env)
 			| _ -> raise(Failure("Unrecognized datatype"))
 	in
 	let sexpr1 = check_class_id obj in
