@@ -85,7 +85,7 @@ and sstmt_gen llbuilder loop_stack = function
 	(* NOTE: this requires a function body to be non-empty, is this ok? *)
 	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder loop_stack) stmts)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
-	| SReturn(sexpr, t) -> ret_gen llbuilder sexpr t
+	| SReturn(sexpr, _) -> ret_gen llbuilder sexpr
 	| SIf(if_sexpr, if_stmts, elseifs, else_sstmts) ->
 		if_gen llbuilder loop_stack if_sexpr if_stmts elseifs else_sstmts
 	| SFor(sexpr1, sexpr2, sexpr3, sstmts) ->
@@ -112,7 +112,7 @@ and sexpr_gen llbuilder = function
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
 	| SLstCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
-	| SFieldAccess(c, rhs, typ) -> field_access_gen llbuilder c rhs typ true
+	| SFieldAccess(c, rhs, _) -> field_access_gen llbuilder c rhs true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
 	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
 	| SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
@@ -192,7 +192,6 @@ and cast_gen llbuilder to_typ sexpr =
 	let from_typ = get_type_from_sexpr sexpr in
 	match from_typ with
 		  A.Bool -> (
-			let zero = L.const_int i1_t 0 in
 			match to_typ with
 			  A.Bool -> lexpr
 			| A.Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
@@ -253,21 +252,21 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
-		(* TODO: add functionality	for tuples, etc. *)
-		| SFieldAccess(id, field, typ) -> field_access_gen llbuilder id field typ false, true
+		(* TODO: add functionality  for tuples, etc. *)
+		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field false, true
 		| _ -> raise(Failure("Unable to assign."))
 	in
 
 	let rhs = match sexpr2 with
 		  SId(id, typ) -> (match typ with
-			  A.ClassTyp(classname) -> id_gen llbuilder id false
+			  A.ClassTyp(_) -> id_gen llbuilder id false
 			| _ -> id_gen llbuilder id true)
-		| SFieldAccess(id, field, typ) -> field_access_gen llbuilder id field typ true
+		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field true
 		| _ -> sexpr_gen llbuilder sexpr2
 	in
 
 	let rhs = match typ with
-		  A.ClassTyp(classname) ->
+		  A.ClassTyp(_) ->
 			if is_obj_access then
 				rhs
 			else
@@ -284,7 +283,6 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 (* I don't think we should mul here; build_array_malloc should malloc len * sizeof(typ) it seems from llvm code generated *)
 and lst_create_gen llbuilder t sexprl =
 	let sexprl = List.rev sexprl in (* seems elements are appended in reverse? *)
-	let len = L.const_int i32_t (List.length sexprl) in
 	let len_real = L.const_int i32_t ((List.length sexprl) + 1) in
 	let typ = get_llvm_type t in
 	let lst = L.build_array_malloc typ len_real "tmp" llbuilder in
@@ -296,7 +294,7 @@ and lst_create_gen llbuilder t sexprl =
 	ignore(L.build_store llval ptr llbuilder); ) llvalues;
 	lst
 
-and field_access_gen llbuilder id rhs typ isAssign =
+and field_access_gen llbuilder id rhs isAssign =
 	let check_id id =
 		match id with
 		 SId(s, d) -> id_gen llbuilder s false
@@ -304,7 +302,7 @@ and field_access_gen llbuilder id rhs typ isAssign =
 		| _ -> raise(Failure("expected access lhs to be an id"))
 	in
 
-	let rec check_rhs isLHS par_exp par_typ rhs =
+	let rec check_rhs par_exp par_typ rhs =
 		let class_name = A.string_of_typ par_typ in
 		match rhs with
 		SId(s, d) ->
@@ -317,16 +315,16 @@ and field_access_gen llbuilder id rhs typ isAssign =
 			in
 			_val
 		| SCall(fname, exprl, ftyp) -> call_gen llbuilder fname exprl ftyp
-		| SFieldAccess(e1, e2, d) ->
+		| SFieldAccess(e1, e2, _) ->
 				let e1_typ = Se.get_type_from_sexpr e1 in
-				let e1 = check_rhs true par_exp par_typ e1 in
-				let e2 = check_rhs true e1 e1_typ e2 in
+				let e1 = check_rhs par_exp par_typ e1 in
+				let e2 = check_rhs e1 e1_typ e2 in
 				e2
 		| _ -> raise(Failure("illegal rhs type for access"))
 	in
 	let id_typ = Se.get_type_from_sexpr id in
 	let id = check_id id in
-	let rhs = check_rhs true id id_typ rhs in
+	let rhs = check_rhs id id_typ rhs in
 	rhs
 
 and obj_create_gen llbuilder typ sexprl =
@@ -336,7 +334,7 @@ and obj_create_gen llbuilder typ sexprl =
 	obj
 
 and cast_malloc_gen llbuilder sexprl stype =
-	let cast_malloc llbuilder lhs curTyp newTyp =
+	let cast_malloc llbuilder lhs newTyp =
 		match newTyp with
 			A.ClassTyp(c) -> let obj_llvm_typ = get_llvm_type (A.ClassTyp(c)) in L.build_pointercast lhs obj_llvm_typ "tmp" llbuilder
 		| _ as c -> raise(Failure("RIP cannot cast to " ^ A.string_of_typ c))
@@ -344,15 +342,15 @@ and cast_malloc_gen llbuilder sexprl stype =
 	let sexpr = List.hd sexprl in
 	let old_typ = Se.get_type_from_sexpr sexpr in
 	let lhs = match sexpr with
-		  SId(id, d) -> id_gen llbuilder id false
-		| SFieldAccess(e1, e2, d) -> field_access_gen llbuilder e1 e2 d false
+		  SId(id, _) -> id_gen llbuilder id false
+		| SFieldAccess(e1, e2, _) -> field_access_gen llbuilder e1 e2 false
 		| _ -> sexpr_gen llbuilder sexpr
 	in
-	cast_malloc llbuilder lhs old_typ stype
+	cast_malloc llbuilder lhs stype
 
 and method_call_gen llbuilder obj_expr fname sexprl styp =
 	match obj_expr with
-	SId(obj_name, obj_typ) ->
+	SId(_, obj_typ) ->
 		let the_func = func_lookup fname in
 		let match_sexpr se = match se with
 		  SId(id, d) -> let isDeref = match d with
@@ -404,13 +402,13 @@ and print_gen llbuilder sexpr_list =
 		L.build_call (func_lookup "printf")
 			(Array.of_list (s :: params)) "print" llbuilder
 
-and ret_gen llbuilder sexpr t =
+and ret_gen llbuilder sexpr =
 	match sexpr with
 		  SId(name, t) ->
 					 (match t with
 					 | A.ClassTyp(_) -> L.build_ret (id_gen llbuilder name false) llbuilder
 					 | _ -> L.build_ret (id_gen llbuilder name true) llbuilder)
-				| SFieldAccess(e1, e2, d) -> L.build_ret (field_access_gen llbuilder e1 e2 d true) llbuilder
+				| SFieldAccess(e1, e2, _) -> L.build_ret (field_access_gen llbuilder e1 e2 true) llbuilder
 				| SNoexpr ->
 			L.build_ret_void llbuilder
 		| _ ->

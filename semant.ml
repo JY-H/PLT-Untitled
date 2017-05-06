@@ -129,11 +129,6 @@ let reserved_list =
 		}
 	in
         (* wrapper types, so that Any can be used *)
-        let char_t = CharArray(1) in
-        let str_t = String in
-        let int_t = Int in
-		let float_t = Float in
-        let void_t = Void in
 	let reserved = [
 		reserved_struct "print_string" (Void) ([Formal(String, "string_arg")]);
 		reserved_struct "print_int" (Void) ([Formal(Int, "int_arg")]);
@@ -254,7 +249,7 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 		
 let get_scdecl_from_cdecl class_maps sfdecls cdecl =
 	let class_map = StringMap.find cdecl.cname class_maps in
-	let field_list = StringMap.fold (fun k v lst ->
+	let field_list = StringMap.fold (fun _ v lst ->
 		v :: lst
 	) class_map.class_fields []
 	in
@@ -430,7 +425,6 @@ and check_assign env expr1 expr2 =
 						(string_of_typ typ2) ^ " to " ^
 						(string_of_typ typ1) ^ "\n"))
 				in
-				let list_typ = get_type_from_sexpr typed_list in
 				SAssign(sexpr1, typed_list, typ1), env
 			else
 				raise(Failure("Cannot assign type " ^
@@ -454,7 +448,6 @@ and check_assign env expr1 expr2 =
 						(string_of_typ typ2) ^ " to " ^
 						(string_of_typ typ1) ^ "\n"))
 				in
-				let list_typ = get_type_from_sexpr typed_list in
 				SAssign(sexpr1, typed_list, typ1), env
 			(* TODO for Kim: Check if empty list *)
 			else
@@ -594,8 +587,8 @@ and check_seq_access env lst_expr start_expr end_expr =
 	if not check_access_types then
 		(* Invalid type used in sequence access *)
 		raise(Failure("Invalid type used in sequence access: " ^
-		(string_of_typ lst_typ) ^
-		(string_of_typ start_typ) ^
+		(string_of_typ lst_typ) ^ " " ^
+		(string_of_typ start_typ) ^ " " ^
 		(string_of_typ end_typ)))
 	else
 		SSeqAccess(lst_sexpr, start_sexpr, end_sexpr), env
@@ -653,7 +646,7 @@ and check_field_access env obj field =
 and check_object_create env t el =
     let s = string_of_typ t in
     let sel, env = get_sexprl env el in
-    let cmap =
+    let _ =
         try StringMap.find s env.env_class_maps
         with | Not_found -> raise(Failure("cannot construct undefined class object"))
     in
@@ -783,7 +776,7 @@ and check_while env expr stmts =
 	let new_env = add_empty_block env "while" in
 	let sexpr, new_env = get_sexpr new_env expr in
 	let typ = get_type_from_sexpr sexpr in
-	let sstmts, new_env = get_sstmt new_env stmts in
+	let sstmts, _ = get_sstmt new_env stmts in
 	match typ with
 		  Bool | Void -> SWhile(sexpr, sstmts), env
 		| _ -> raise(Failure("While condition only allows bool or void" ^
@@ -869,9 +862,6 @@ and check_local_var env typ id expr =
 								(string_of_typ sexpr_typ) ^ " to " ^
 								(string_of_typ typ) ^ "\n"))
 						in
-						let list_typ = get_type_from_sexpr typed_list in
-						(* KILL_ME: debug print to check list retyping *)
-						(*print_string (string_of_typ list_typ ^ "\n");*)
 						SLocalVar(typ, id, typed_list), env
 					else
 						raise(Failure("Declared type of " ^ id ^
@@ -955,15 +945,15 @@ let rec check_block_return sblock =
 		  [] -> false
 		| head :: tail -> (match head with
 			  SReturn(_, _) -> true
-			| SIf(if_sexpr, if_sstmts, elseifs, else_sstmts) ->
-				check_if_return if_sexpr if_sstmts elseifs else_sstmts
+			| SIf(_, if_sstmts, elseifs, else_sstmts) ->
+				check_if_return if_sstmts elseifs else_sstmts
 			| _ -> find_return tail
 			)
 	in
 	find_return sstmts
 
 (* Check whether an if-elseif-else block will definitely return *)
-and check_if_return if_sexpr if_sstmts elseifs else_sstmts =
+and check_if_return if_sstmts elseifs else_sstmts =
 	let if_returns = check_block_return if_sstmts in
 	let else_returns = check_block_return else_sstmts in
 	if not if_returns || not else_returns then
@@ -988,7 +978,7 @@ and check_if_return if_sexpr if_sstmts elseifs else_sstmts =
 		check_elseifs_return elseifs
 
 (* return type is handled in check_return *)
-let check_func_has_return fname sfbody return_typ =
+let check_func_has_return sfbody return_typ =
 	let len = List.length sfbody in
 	if return_typ = Void then
 		SExpr(SNoexpr, Void)
@@ -1000,11 +990,11 @@ let check_func_has_return fname sfbody return_typ =
 			  [] -> false
 			| head :: tail -> (match head with
 				  SReturn(_, _) -> true
-				| SIf(if_sexpr, if_sstmts, elseifs, else_sstmts) ->
+				| SIf(_, if_sstmts, elseifs, else_sstmts) ->
 					(* Check if there is an if-elseif-else block which is
 					guaranteed to return *)
 					let guaranteed_if_return =
-					check_if_return if_sexpr if_sstmts elseifs else_sstmts
+					check_if_return if_sstmts elseifs else_sstmts
 					in
 					if guaranteed_if_return then
 						true
@@ -1075,7 +1065,7 @@ let get_sfdecl_from_fdecl class_maps reserved cname fdecl =
         else
 	(* NOTE: tmp_env unused for now *)
 	let func_sbody, _ = get_sstmtl env fdecl.body in
-	let func_sbody = List.rev(check_func_has_return fdecl.fname func_sbody
+	let func_sbody = List.rev(check_func_has_return func_sbody
 	fdecl.return_typ :: List.rev(func_sbody)) in
 	{
 		stype = fdecl.return_typ;
