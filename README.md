@@ -24,7 +24,7 @@ make
 Every pull request should come with a test case to prove that the newly implemented functionality fully works.
 
 #### Coding TODOs:
-* list
+* list (empty lists and append)
 * exceptions, basic features such as real print and I/O (if we still want to do RPSLK)
 
 #### TESTING TODOs:

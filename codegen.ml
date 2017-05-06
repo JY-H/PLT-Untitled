@@ -112,6 +112,8 @@ and sexpr_gen llbuilder = function
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
 	| SLstCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
+	| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, _) ->
+		seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr false
 	| SFieldAccess(c, rhs, _) -> field_access_gen llbuilder c rhs true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
 	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
@@ -253,6 +255,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
 		(* TODO: add functionality  for tuples, etc. *)
+		| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, _) ->
+			seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr true, false
 		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field false, true
 		| _ -> raise(Failure("Unable to assign."))
 	in
@@ -282,7 +286,6 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
  * multiple dimensions may work since LstCreate is processed recursively? llvm code looks kinda promising, but we can only tell after access is implemented *)
 (* I don't think we should mul here; build_array_malloc should malloc len * sizeof(typ) it seems from llvm code generated *)
 and lst_create_gen llbuilder t sexprl =
-	let sexprl = List.rev sexprl in (* seems elements are appended in reverse? *)
 	let len_real = L.const_int i32_t ((List.length sexprl) + 1) in
 	let typ = get_llvm_type t in
 	let lst = L.build_array_malloc typ len_real "tmp" llbuilder in
@@ -293,6 +296,19 @@ and lst_create_gen llbuilder t sexprl =
 	llbuilder in
 	ignore(L.build_store llval ptr llbuilder); ) llvalues;
 	lst
+
+(* Access a list *)
+and seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr is_assign =
+	let lst = sexpr_gen llbuilder lst_sexpr in
+	let start_index = sexpr_gen llbuilder start_sexpr in
+	(* TODO: list splicing *)
+	let start_index = L.build_add start_index (L.const_int i32_t 1) "list_index"
+		llbuilder in
+	let _val = L.build_gep lst [| start_index |] "list_access" llbuilder in
+	if is_assign then
+		_val
+	else
+		L.build_load _val "list_access_val" llbuilder
 
 and field_access_gen llbuilder id rhs isAssign =
 	let check_id id =

@@ -1,6 +1,6 @@
-main() -> void {
+main() -> int {
 	// Basic int list
-	//[int] i = [100, 200];
+	[int] i = [100, 200];
 
 	// List of empty lists assigned to list of lists of ints
 	//[[int]] j = [[], [], []];
@@ -16,4 +16,6 @@ main() -> void {
 
 	// Below won't work because float in list of of list of ints
 	// [[int]] n = [[0, 1], [2], [3.0]];
+
+	return 0;
 }

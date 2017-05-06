@@ -261,7 +261,7 @@ let get_scdecl_from_cdecl class_maps sfdecls cdecl =
 		}
 	}
 
-let rec get_type_from_sexpr = function
+let get_type_from_sexpr = function
 	  SIntLit(_) -> Int
 	| SBoolLit(_) -> Bool
 	| SFloatLit(_) -> Float
@@ -274,12 +274,7 @@ let rec get_type_from_sexpr = function
 	| SAssign(_, _, t) -> t
 	| SCast(t, _) -> t
 	| SLstCreate(_, t) -> t
-	| SSeqAccess(lst_sexpr, _, _) ->
-		let lst_typ = get_type_from_sexpr lst_sexpr in
-		(match lst_typ with
-		  Lst(t) -> t
-		| _ -> raise(Failure("Invalid sequence access."))
-		)
+	| SSeqAccess(_, _, _, t) -> t
 	| SFieldAccess(_, _, t) -> t
 	| SCall(_, _, t) -> t
 	| SMethodCall(_, _, _, t) -> t
@@ -428,6 +423,21 @@ and check_assign env expr1 expr2 =
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
+		| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, typ) ->
+			if typ1 = typ2 then
+				SAssign(sexpr1, sexpr2, typ1), env
+			else if valid_untyped_list_assign typ1 typ2 then
+				(* Change untyped list to typed list *)
+				let typed_list = match sexpr2 with
+					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
+					| _ -> raise(Failure("Cannot assign " ^
+						(string_of_typ typ2) ^ " to " ^
+						(string_of_typ typ1) ^ "\n"))
+				in
+				SAssign(sexpr1, typed_list, typ1), env
+			else
+				raise(Failure("Invalid sequence access assignment"))
+
 		| SFieldAccess(_, sid, _) ->
 			let id = match sid with
 				  SId(id, _) -> id
@@ -439,15 +449,6 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
-			else if valid_untyped_list_assign typ1 typ2 then
-				(* Change untyped list to typed list *)
-				let typed_list = match sexpr2 with
-					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
-					| _ -> raise(Failure("Cannot assign " ^
-						(string_of_typ typ2) ^ " to " ^
-						(string_of_typ typ1) ^ "\n"))
-				in
-				SAssign(sexpr1, typed_list, typ1), env
 			(* TODO for Kim: Check if empty list *)
 			else
 				raise(Failure("Cannot assign type " ^
@@ -471,9 +472,8 @@ and check_func_call env fname el obj_id =
 		in
 	let sel, env = get_sexprl env el in
 	let check_param formal param =
-		let f_typ = (match formal with
-			Formal(t, _) -> t
-			| _ -> Void) in
+		let f_typ = match formal with
+			Formal(t, _) -> t in
 		let p_typ = get_type_from_sexpr param in
 		if (f_typ = p_typ) then param
 		else raise(Failure("Incorrect type passed to function"))
@@ -584,6 +584,14 @@ and check_seq_access env lst_expr start_expr end_expr =
 		  Lst(_), Int, Int | Lst(_), Int, Void -> true
 		| _ -> false
 	in
+
+	(* Unwrap type from list *)
+	let typ = get_type_from_sexpr lst_sexpr in
+	let typ = match typ with
+	  Lst(t) -> t
+	| _ -> raise(Failure("Invalid sequence access."))
+	in
+
 	if not check_access_types then
 		(* Invalid type used in sequence access *)
 		raise(Failure("Invalid type used in sequence access: " ^
@@ -591,7 +599,7 @@ and check_seq_access env lst_expr start_expr end_expr =
 		(string_of_typ start_typ) ^ " " ^
 		(string_of_typ end_typ)))
 	else
-		SSeqAccess(lst_sexpr, start_sexpr, end_sexpr), env
+		SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, typ), env
 
 and check_field_access env obj field =
 	(* Find class exists *)
@@ -617,10 +625,9 @@ and check_field_access env obj field =
 				try (
 					let class_map = StringMap.find class_name
 						lhs_env.env_class_maps in
-					let match_field f = (match f with
-						ObjVar(dt, _, _) -> SId(id, dt), lhs_env
+					let match_field f = match f with
+						  ObjVar(dt, _, _) -> SId(id, dt), lhs_env
 						| ObjConst(dt, _, _) ->	SId(id, dt), lhs_env
-						| _ -> raise(Failure("Not a variable or const")))
 					in
 					match_field (StringMap.find id class_map.class_fields))
 				with | Not_found -> raise(Failure("Unrecognized field")))

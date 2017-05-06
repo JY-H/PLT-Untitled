@@ -242,8 +242,8 @@ lits:
 	| NULL				{ Null }
 
 sequence:
-	  LPAREN expr COMMA tuple_elems	{ TupleCreate(List.rev ($2 :: $4)) }
-	| LBRACK list_elems		{ LstCreate(List.rev $2) }
+	  LPAREN expr COMMA tuple_elems	{ TupleCreate($2 :: $4) }
+	| LBRACK list_elems		{ LstCreate($2) }
 
 tuple_elems:
 	  RPAREN					{ [] }
