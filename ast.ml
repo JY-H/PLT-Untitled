@@ -91,12 +91,13 @@ let rec string_of_typ = function
 	| Bool -> "bool"
 	| String -> "string"
 	| Void -> "void"
-        | Null_t -> "null"
+    | Null_t -> "null"
+	| Any -> "any"
 	| Char -> "char"
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
 	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
 	| ClassTyp(id) -> id
-        | CharArray(n) -> "array of length " ^ string_of_int n
+    | CharArray(n) -> "array of length " ^ string_of_int n
 
 let string_of_op = function
 	  Add -> "+"

@@ -266,7 +266,7 @@ let get_scdecl_from_cdecl class_maps sfdecls cdecl =
 		}
 	}
 
-let get_type_from_sexpr = function
+let rec get_type_from_sexpr = function
 	  SIntLit(_) -> Int
 	| SBoolLit(_) -> Bool
 	| SFloatLit(_) -> Float
@@ -278,8 +278,14 @@ let get_type_from_sexpr = function
 	| SUnop(_, _, t) -> t
 	| SAssign(_, _, t) -> t
 	| SCast(t, _) -> t
-	| SFieldAccess(_, _, t) -> t
 	| SLstCreate(_, t) -> t
+	| SSeqAccess(lst_sexpr, _, _) ->
+		let lst_typ = get_type_from_sexpr lst_sexpr in
+		(match lst_typ with
+		  Lst(t) -> t
+		| _ -> raise(Failure("Invalid sequence access."))
+		)
+	| SFieldAccess(_, _, t) -> t
 	| SCall(_, _, t) -> t
 	| SMethodCall(_, _, _, t) -> t
 	| SObjCreate(t, _) -> t
@@ -416,8 +422,7 @@ and check_assign env expr1 expr2 =
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
 			(* Check if rhs is empty list and nesting level works *)
-			else if is_list typ1 && is_untyped_list typ2 &&
-				get_nesting_level typ2 <= get_nesting_level typ1 then
+			else if valid_untyped_list_assign typ1 typ2 then
 				(* Change untyped list to typed list *)
 				let typed_list = match sexpr2 with
 					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
@@ -426,8 +431,6 @@ and check_assign env expr1 expr2 =
 						(string_of_typ typ1) ^ "\n"))
 				in
 				let list_typ = get_type_from_sexpr typed_list in
-				(* KILL_ME: debug print to check list retyping *)
-				(*print_string (string_of_typ list_typ ^ "\n");*)
 				SAssign(sexpr1, typed_list, typ1), env
 			else
 				raise(Failure("Cannot assign type " ^
@@ -443,6 +446,16 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
+			else if valid_untyped_list_assign typ1 typ2 then
+				(* Change untyped list to typed list *)
+				let typed_list = match sexpr2 with
+					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
+					| _ -> raise(Failure("Cannot assign " ^
+						(string_of_typ typ2) ^ " to " ^
+						(string_of_typ typ1) ^ "\n"))
+				in
+				let list_typ = get_type_from_sexpr typed_list in
+				SAssign(sexpr1, typed_list, typ1), env
 			(* TODO for Kim: Check if empty list *)
 			else
 				raise(Failure("Cannot assign type " ^
@@ -714,6 +727,7 @@ and check_if env if_expr if_stmts elseifs else_stmts =
 		else
 			raise(Failure("If condition must be a bool"))
 	in
+	check_if_expr;
 	let if_sstmts, _ = get_sstmt if_env if_stmts in
 	(* Generate list of selseifs *)
 	let rec get_selseifs elseifs = match elseifs with
