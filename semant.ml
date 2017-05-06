@@ -579,6 +579,27 @@ and check_lst_create env exprs =
 		(* TODO: handle typeless lists specially *)
 		SLstCreate(sexprs, Lst(Void)), env
 
+and check_seq_access env lst_expr start_expr end_expr =
+	(* Check first expr is a list, second and third are ints *)
+	let lst_sexpr, _ = get_sexpr env lst_expr in
+	let lst_typ = get_type_from_sexpr lst_sexpr in
+	let start_sexpr, _ = get_sexpr env start_expr in
+	let start_typ = get_type_from_sexpr start_sexpr in
+	let end_sexpr, _ = get_sexpr env end_expr in
+	let end_typ = get_type_from_sexpr end_sexpr in
+	let check_access_types = match lst_typ, start_typ, end_typ with
+		  Lst(_), Int, Int | Lst(_), Int, Void -> true
+		| _ -> false
+	in
+	if not check_access_types then
+		(* Invalid type used in sequence access *)
+		raise(Failure("Invalid type used in sequence access: " ^
+		(string_of_typ lst_typ) ^
+		(string_of_typ start_typ) ^
+		(string_of_typ end_typ)))
+	else
+		SSeqAccess(lst_sexpr, start_sexpr, end_sexpr), env
+
 and check_field_access env obj field =
 	(* Find class exists *)
 	let check_class_id expr = match expr with
@@ -652,6 +673,8 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| LstCreate(exprs) -> check_lst_create env exprs
+	| SeqAccess(lst_expr, start_expr, end_expr) -> 
+		check_seq_access env lst_expr start_expr end_expr
 	| FieldAccess(classid, field) -> check_field_access env classid field
 	| MethodCall(e, str, el) -> check_method_call env e str el
 	(* does not work on class whose field is a class e.g. a.b.method(), fixable by recursively processing e in check_func_call *)
