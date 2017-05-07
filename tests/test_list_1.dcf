@@ -1,6 +1,10 @@
 main() -> int {
 	// Basic int list
-	[int] i = [100, 200];
+	[int] i = [100];
+
+	i[0];
+	//print_int(i[0]);
+	//print_string("\n");
 
 	// List of empty lists assigned to list of lists of ints
 	//[[int]] j = [[], [], []];
@@ -12,7 +16,9 @@ main() -> int {
 	//[[int]] l = [[[]]];
 
 	// List of nonempty int lists assigned to list of lists of ints
-	[[int]] m = [[0, 100], [200], [300, 400, 500, 600]];
+	//[[int]] m = [[0, 100], [200], [300, 400, 500, 600]];
+
+	//print_int(m[0][0]);
 
 	// Below won't work because float in list of of list of ints
 	// [[int]] n = [[0, 1], [2], [3.0]];

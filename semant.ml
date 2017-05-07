@@ -541,6 +541,12 @@ and check_cast env to_typ expr =
 
 (* Check list creation *)
 and check_lst_create env exprs =
+	(* TODO: make this malloc *)
+    (*let init_self = [SLocalVar(class_typ, "self",
+		SCall("cast", [SCall("malloc", [SIntLit(100)], CharArray(100))],
+            Int))]
+    in*)
+
 	(* Convert list of exprs to list of sexprs *)
 	let sexprs = List.map
 		(fun expr -> fst (get_sexpr env expr)) exprs in

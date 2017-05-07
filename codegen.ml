@@ -75,8 +75,8 @@ let rec id_gen llbuilder id is_deref =
 			raise(Failure("Unknown variable " ^ id))
 
 and func_lookup fname = match (L.lookup_function fname codegen_module) with
-		  None -> raise(Failure(" function " ^ fname ^ " does not exist."))
-		| Some func -> func
+	  None -> raise(Failure(" function " ^ fname ^ " does not exist."))
+	| Some func -> func
 
 and string_gen llbuilder s =
 	L.build_global_stringptr s "tmp" llbuilder
@@ -141,8 +141,8 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
 		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
 		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
-				| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
-				(*I think several others are missing, like or*)
+		| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
+		| A.Or -> L.build_or expr1 expr2 "int_ortmp" llbuilder
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
@@ -168,9 +168,9 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Float -> float_ops lexpr1 op lexpr2
 		| A.Bool -> (match typ1, typ2 with
 			A.Int, A.Int | A.Bool, A.Bool -> int_ops lexpr1 op lexpr2
-			| A.Float, A.Float -> float_ops lexpr1 op lexpr2
-			| _, _ -> raise(Failure("Cannot perform operations on types "
-				^ A.string_of_typ typ1 ^ " and " ^ A.string_of_typ typ2)))
+		| A.Float, A.Float -> float_ops lexpr1 op lexpr2
+		| _, _ -> raise(Failure("Cannot perform operations on types "
+			^ A.string_of_typ typ1 ^ " and " ^ A.string_of_typ typ2)))
 		| _ -> raise(Failure("Unrecognized data type in binop"))
 
 and unop_gen llbuilder unop sexpr typ =
@@ -249,9 +249,6 @@ and cast_gen llbuilder to_typ sexpr =
 
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
-	(* KILL_ME: kill this if unused by end of project *)
-	(*let rhs_typ = get_type_from_sexpr sexpr2 in*)
-
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
 		(* TODO: add functionality  for tuples, etc. *)
@@ -282,38 +279,70 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
 
-(* written only for 1D lists atm
- * multiple dimensions may work since LstCreate is processed recursively? llvm code looks kinda promising, but we can only tell after access is implemented *)
-(* I don't think we should mul here; build_array_malloc should malloc len * sizeof(typ) it seems from llvm code generated *)
+(* Creates a list *)
 and lst_create_gen llbuilder t sexprl =
-	let len_real = L.const_int i32_t ((List.length sexprl) + 1) in
+	(* Prepare your butt *)
+	let lst_typ = find_global_class "list" in
+
+	(* Malloc for list struct *)
+	let lst_struct = L.build_malloc lst_typ "malloc_list_struct"
+		llbuilder in
+
+	let len = List.length sexprl in
+
+	let len_real = L.const_int i32_t (len + 1) in
 	let typ = get_llvm_type t in
-	let lst = L.build_array_malloc typ len_real "tmp" llbuilder in
-	let lst = L.build_pointercast lst typ "tmp"
-	llbuilder in
+	let lst = L.build_array_malloc typ len_real "malloc_list" llbuilder
+	in
+	let lst = L.build_pointercast lst typ "cast_malloc_list" llbuilder
+	in
 	let llvalues = List.map (sexpr_gen llbuilder) sexprl in
-	List.iteri (fun i llval -> let ptr = L.build_gep lst [|(L.const_int i32_t (i+1))|] "tmp"
-	llbuilder in
-	ignore(L.build_store llval ptr llbuilder); ) llvalues;
-	lst
+
+	(* Malloc for list elements *)
+	List.iteri (fun i llval ->
+		let ptr = L.build_gep lst [| L.const_int i32_t (i + 1) |] "elem"
+			llbuilder in
+		ignore(L.build_store llval ptr llbuilder); ) llvalues;
+
+	(* Set lst struct pointer to ptr *)
+	let lst_ptr = L.build_struct_gep lst_struct 1 "list_ptr"
+		llbuilder in
+	let lst_ptr = L.build_pointercast lst_ptr (L.pointer_type typ)
+		"cast_list_ptr" llbuilder in
+	ignore(L.build_store lst lst_ptr llbuilder);
+
+	(* Set length *)
+	let len_lval = L.const_int i32_t len in
+	let len_ptr = L.build_struct_gep lst_struct 0 "len_ptr" llbuilder in
+	ignore(L.build_store len_lval len_ptr llbuilder);
+
+	L.build_load lst_struct "lst_struct" llbuilder
 
 (* Access a list *)
 and seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr is_assign =
-	let lst = sexpr_gen llbuilder lst_sexpr in
-	let start_index = sexpr_gen llbuilder start_sexpr in
+	(* Dereference the list struct *)
+	let lst_struct = sexpr_gen llbuilder lst_sexpr in
+	(*let lst_ptr = L.build_struct_gep lst_struct 0 "list_ptr" llbuilder in
+	let deref_index = L.const_int i32_t 1 in
+	let lst = L.build_gep lst_ptr [| deref_index |] "list_ptr_deref" llbuilder
+	in*)
+
+	(* Access the list *)
+	(*let start_index = sexpr_gen llbuilder start_sexpr in
 	(* TODO: list splicing *)
 	let start_index = L.build_add start_index (L.const_int i32_t 1) "list_index"
 		llbuilder in
-	let _val = L.build_gep lst [| start_index |] "list_access" llbuilder in
+	let _val = L.build_gep lst_ptr [| start_index |] "list_access" llbuilder in
 	if is_assign then
 		_val
 	else
-		L.build_load _val "list_access_val" llbuilder
+		L.build_load _val "list_access_val" llbuilder*)
+	L.const_int i32_t 0
 
-and field_access_gen llbuilder id rhs isAssign =
+and field_access_gen llbuilder id rhs is_assign =
 	let check_id id =
 		match id with
-		 SId(s, _) -> id_gen llbuilder s false
+		  SId(s, _) -> id_gen llbuilder s false
 		(* array *)
 		| _ -> raise(Failure("expected access lhs to be an id"))
 	in
@@ -321,13 +350,21 @@ and field_access_gen llbuilder id rhs isAssign =
 	let rec check_rhs par_exp par_typ rhs =
 		let class_name = A.string_of_typ par_typ in
 		match rhs with
-		SId(s, d) ->
+		  SId(s, d) ->
 			let field_name = (class_name ^ "." ^ s) in
 			let field_index = Hash.find class_fields field_name in
 			let _val = L.build_struct_gep par_exp field_index s llbuilder in
 			let _val = match d with
-				A.ClassTyp(_) -> if isAssign then L.build_load _val s llbuilder else _val
-				| _ -> if isAssign then L.build_load _val s llbuilder else _val
+				  A.ClassTyp(_) ->
+					if is_assign then
+						L.build_load _val s llbuilder
+					else
+						_val
+				| _ ->
+					if is_assign then
+						L.build_load _val s llbuilder
+					else
+						_val
 			in
 			_val
 		| SCall(fname, exprl, ftyp) -> call_gen llbuilder fname exprl ftyp
@@ -350,9 +387,11 @@ and obj_create_gen llbuilder typ sexprl =
 	obj
 
 and cast_malloc_gen llbuilder sexprl stype =
-	let cast_malloc llbuilder lhs newTyp =
-		match newTyp with
-			A.ClassTyp(c) -> let obj_llvm_typ = get_llvm_type (A.ClassTyp(c)) in L.build_pointercast lhs obj_llvm_typ "tmp" llbuilder
+	let cast_malloc llbuilder lhs new_typ =
+		match new_typ with
+		  A.ClassTyp(c) ->
+			let obj_llvm_typ = get_llvm_type (A.ClassTyp(c)) in
+			L.build_pointercast lhs obj_llvm_typ "tmp" llbuilder
 		| _ as c -> raise(Failure("RIP cannot cast to " ^ A.string_of_typ c))
 	in
 	let sexpr = List.hd sexprl in
@@ -365,20 +404,20 @@ and cast_malloc_gen llbuilder sexprl stype =
 
 and method_call_gen llbuilder obj_expr fname sexprl styp =
 	match obj_expr with
-	SId(_, obj_typ) ->
+	  SId(_, obj_typ) ->
 		let the_func = func_lookup fname in
 		let match_sexpr se = match se with
-			SId(id, d) -> let isDeref = match d with
+			SId(id, d) -> let is_deref = match d with
 				  A.ClassTyp(_) -> false
 				| _ -> true
-		in id_gen llbuilder id isDeref
+		in id_gen llbuilder id is_deref
 	| se -> sexpr_gen llbuilder se in
 		let lhs = match_sexpr obj_expr in
 		let self_param = L.build_pointercast lhs
 			(get_llvm_type obj_typ) "tmp" llbuilder in
 		let params = List.map match_sexpr sexprl in
 			(match styp with
-			A.Void -> L.build_call the_func (Array.of_list
+			  A.Void -> L.build_call the_func (Array.of_list
 				(self_param :: params)) "" llbuilder
 			| _ -> L.build_call the_func (Array.of_list
 				(self_param :: params)) "tmp" llbuilder)
@@ -388,17 +427,17 @@ and func_call_gen llbuilder fname sexprl stype =
 	let the_func = func_lookup fname in
 	let params = List.map (sexpr_gen llbuilder) sexprl in
 	match stype with
-	A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
+		  A.Void -> L.build_call the_func (Array.of_list params) "" llbuilder
 		| _ -> L.build_call the_func (Array.of_list params) "tmp" llbuilder
 
 and call_gen llbuilder fname sexprl stype =
 		match fname with
-				(* full list of built-in and linked functions just for clarity*)
-				 "print_string" | "print_int" | "print_float" ->
-					print_gen llbuilder sexprl
-				| "malloc" -> func_call_gen llbuilder fname sexprl stype
-				| "cast" -> cast_malloc_gen llbuilder sexprl stype
-				| _ -> func_call_gen llbuilder fname sexprl stype
+			(* full list of built-in and linked functions just for clarity*)
+			  "print_string" | "print_int" | "print_float" ->
+				print_gen llbuilder sexprl
+			| "malloc" -> func_call_gen llbuilder fname sexprl stype
+			| "cast" -> cast_malloc_gen llbuilder sexprl stype
+			| _ -> func_call_gen llbuilder fname sexprl stype
 
 (* Helper method to generate print function for strings. *)
 and print_gen llbuilder sexpr_list =
@@ -609,6 +648,9 @@ and local_var_gen llbuilder typ id sexpr =
 		  A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
 			find_global_class classname, false
+		| A.Lst(t) -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
+			"nop" llbuilder),
+			find_global_class "list", false
 		| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
@@ -618,7 +660,7 @@ and local_var_gen llbuilder typ id sexpr =
 	if flag = false then (
 		let lhs = SId(id, typ) in
 		match sexpr with
-				SNoexpr -> alloc
+				  SNoexpr -> alloc
 				| _ -> assign_gen llbuilder lhs sexpr typ )
 	else
 		let lhs_gen = id_gen llbuilder id false in
@@ -626,16 +668,17 @@ and local_var_gen llbuilder typ id sexpr =
 		alloc
 
 (* Declare all built-in functions. This should match the functions added in
- * semant.ml
- *)
+ * semant.ml *)
 let construct_library_functions =
 	let print_type = L.var_arg_function_type i32_t [| L.pointer_type i8_t |]
 	in
 	let _ = L.declare_function "printf" print_type codegen_module
 	in
-		let malloc_type = L.function_type (str_t) [| i32_t |] in
-		let _ = L.declare_function "malloc" malloc_type codegen_module
-		in
+	let malloc_type = L.function_type (str_t) [| i32_t |] in
+	let _ = L.declare_function "malloc" malloc_type codegen_module
+	in
+	(*let length_type = L.function_type i32_t [| |] in
+	let _ = L.declare_function "length" length_type codegen_module in*)
 	()
 
 let init_params func formals =
@@ -670,9 +713,17 @@ let func_body_gen sfdecl =
 			ignore(L.build_ret_void llbuilder);
 		ignore(L.build_unreachable llbuilder)
 
+(* Make list struct with length and ptr *)
+let construct_list =
+	let typ = L.named_struct_type context "list" in
+	Hash.add global_classes "list" typ;
+
+	(* Body contains length and i64 ptr *)
+	L.struct_set_body typ [| i32_t; i32_t |] true
+
 let class_gen s =
-		let typ = L.named_struct_type context s.scname in
-		Hash.add global_classes s.scname typ;
+	let typ = L.named_struct_type context s.scname in
+	Hash.add global_classes s.scname typ;
 
 	let typ = Hash.find global_classes s.scname in
 	let typ_lst = List.map (function
@@ -687,11 +738,11 @@ let class_gen s =
 			let full_name = s.scname ^ "." ^ name in
 			Hash.add class_fields full_name i;
 		) name_lst;
-		L.struct_set_body typ typ_array true;
+	L.struct_set_body typ typ_array true;
 
 	let _ = List.map (fun f -> func_stub_gen f) s.scbody.smethods in
 	let res = List.map (fun f -> func_body_gen f) s.scbody.smethods in
-		res
+	res
 
 
 (*TBA: probably needed when inheritance happens
@@ -700,7 +751,12 @@ let vtbl_gen scdecls =
 
 let translate sprogram =
 	let _ = construct_library_functions in
-		let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) sprogram.classes else [] in
+	(*let _ = construct_list in *)
+	let _ = if (List.length sprogram.classes > 0) then
+		List.map (fun s -> class_gen s) sprogram.classes
+	else
+		[]
+	in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
 		(*		  let _ = vtbl_gen sprogram.classes in*)
