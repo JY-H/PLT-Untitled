@@ -219,7 +219,7 @@ expr:
 	| expr ASSIGN expr	{ Assign($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
 	| sequence	{ LstCreate(fst $1, snd $1) }
-	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
+	| expr sequence_access	{ SeqAccess($1, $2) }
 	| expr DOT ID	{ FieldAccess($1, Id($3)) }
 	| ID LPAREN actuals_opt RPAREN	{ FuncCall($1, $3) }
 	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
@@ -243,8 +243,7 @@ sequence:
 	| LBRACK obj_typ COMMA expr RBRACK		{ ($2, [$4]) }
 
 sequence_access:
-	  LBRACK expr RBRACK	{ ($2, Noexpr) }
-	| LBRACK expr SNGCOLON expr RBRACK	{ ($2, $4) }
+	  LBRACK expr RBRACK	{ $2 }
 
 vdecl:
 	  typ ID SEMI	{ ObjVar($1, $2, Noexpr) }

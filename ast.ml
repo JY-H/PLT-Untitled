@@ -28,7 +28,7 @@ type expr =
 	| Assign of expr * expr
 	| Cast of typ * expr
 	| LstCreate of typ * expr list
-	| SeqAccess of expr * expr * expr
+	| SeqAccess of expr * expr
 	| FieldAccess of expr * expr
 	| MethodCall of expr * string * expr list
 	| FuncCall of string * expr list
@@ -148,11 +148,9 @@ let rec string_of_expr = function
 				head) ^ "]"
 		in
 		string_list exprs
-	| SeqAccess(sequence, start_index, end_index) ->
+	| SeqAccess(sequence, index) ->
 		string_of_expr sequence ^
-		"[" ^ string_of_expr start_index ^ (match end_index with
-		  Noexpr -> ""
-		| _ -> ": " ^ string_of_expr end_index) ^ "]"
+		"[" ^ string_of_expr index ^ "]"
 	| FieldAccess(obj, field) -> string_of_expr obj ^ "." ^ string_of_expr field
 	| MethodCall(obj, fname, args) ->
 		string_of_expr obj ^ "." ^ fname ^
