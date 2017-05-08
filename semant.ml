@@ -273,8 +273,8 @@ let get_type_from_sexpr = function
 	| SUnop(_, _, t) -> t
 	| SAssign(_, _, t) -> t
 	| SCast(t, _) -> t
-	(*| SLstCreate(_, t) -> t
-	| SSeqAccess(_, _, _, t) -> t*)
+	| SLstCreate(_, t) -> t
+	| SSeqAccess(_, _, t) -> t
 	| SFieldAccess(_, _, t) -> t
 	| SCall(_, _, t) -> t
 	| SMethodCall(_, _, _, t) -> t
@@ -370,10 +370,10 @@ and check_unop env op expr =
 		| _ -> raise(Failure("Unop can only be applied to numeric or boolean" ^	"types")))
 
 (* List assignment helpers *)
-(* Returns true if it is a list type
+(* Returns true if it is a list type *)
 and is_list typ = match typ with
 	  Lst(_) -> true
-	| _ -> false*)
+	| _ -> false
 (* Returns true if it is an untyped list; false otherwise *)
 (*and is_untyped_list typ = match typ with
 	  Lst(Void) -> true
@@ -381,15 +381,9 @@ and is_list typ = match typ with
 	| _ -> false*)
 
 (* Returns the level of nesting in the list *)
-(*and get_nesting_level typ = match typ with
+and get_nesting_level lst = match lst with
 	  Lst(inner_typ) -> 1 + get_nesting_level inner_typ
-	| _ -> 0*)
-
-(* Check if the lhs is a list being assigned an empty list *)
-(*and valid_untyped_list_assign typ1 typ2 =
-	is_list typ1 &&
-	is_untyped_list typ2 &&
-	get_nesting_level typ2 <= get_nesting_level typ1*)
+	| _ -> 1
 
 (* Check assignment, returns SAssign on success *)
 and check_assign env expr1 expr2 =
@@ -410,31 +404,15 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
-			(* Check if rhs is empty list and nesting level works *)
-			(*else if valid_untyped_list_assign typ1 typ2 then
-				(* Change untyped list to typed list *)
-				let typed_list = match sexpr2 with
-					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
-					| _ -> raise(Failure("Cannot assign " ^
-						(string_of_typ typ2) ^ " to " ^
-						(string_of_typ typ1) ^ "\n"))
-				in
-				SAssign(sexpr1, typed_list, typ1), env*)
+			(*else if is_list typ1 && get_nesting_level typ1
+				= get_nesting_level typ2 then
+				SAssign(sexpr1, sexpr2, typ1), env			*)
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
-		| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, typ) ->
-			if typ1 = typ2 then
+		| SSeqAccess(lst_sexpr, index_sexpr, typ) ->
+			if get_type_from_sexpr index_sexpr = Int && typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ1), env
-			(*else if valid_untyped_list_assign typ1 typ2 then
-				(* Change untyped list to typed list *)
-				let typed_list = match sexpr2 with
-					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
-					| _ -> raise(Failure("Cannot assign " ^
-						(string_of_typ typ2) ^ " to " ^
-						(string_of_typ typ1) ^ "\n"))
-				in
-				SAssign(sexpr1, typed_list, typ1), env*)
 			else
 				raise(Failure("Invalid sequence access assignment"))
 
@@ -539,67 +517,47 @@ and check_cast env to_typ expr =
 	in
 	scast, env
 
-(* Check list creation *)
-(*and check_lst_create env exprs =
-	(* Convert list of exprs to list of sexprs *)
-	let sexprs = List.map
-		(fun expr -> fst (get_sexpr env expr)) exprs in
-
+and check_lst_create env typ exprs =
+    let sexprs, env = get_sexprl env exprs in  
 	(* Check that the types of all sexprs match *)
-	let rec check_elem_types sexprs = match sexprs with
+	let rec check_elem_typ sexprs = match sexprs with
 		  [] -> ()
-		| [_] -> ()
-		(* Has >1 elem, check all elems match *)
-		| head :: next :: tail ->
+		| head :: tail ->
 			let typ1 = get_type_from_sexpr head in
-			let typ2 = get_type_from_sexpr next in
-			if typ1 <> typ2 then (
-				(* Type-mismatched elems found *)
-				raise(Failure("Mismatched types found in list")))
+			if typ1 <> Int then (
+				raise(Failure("List dimensions must be int")))
 			else
 				(* Check rest of list *)
-				check_elem_types (next :: tail)
-	in
-	check_elem_types sexprs;
+				check_elem_typ (tail)
+	in check_elem_typ sexprs;
 
-	(* Make list of type *)
-	if List.length sexprs > 0 then
-		(* Typed list *)
-		let typ = get_type_from_sexpr (List.hd sexprs) in
-		SLstCreate(sexprs, Lst(typ)), env
-	else
-		(* Untyped empty list *)
-		(* TODO: handle typeless lists specially *)
-		SLstCreate(sexprs, Lst(Void)), env
+	(* Make array of type *)
+	SLstCreate(sexprs, typ), env
 
-and check_seq_access env lst_expr start_expr end_expr =
+and check_seq_access env lst index =
 	(* Check first expr is a list, second and third are ints *)
-	let lst_sexpr, _ = get_sexpr env lst_expr in
+	let lst_sexpr, _ = get_sexpr env lst in
 	let lst_typ = get_type_from_sexpr lst_sexpr in
-	let start_sexpr, _ = get_sexpr env start_expr in
-	let start_typ = get_type_from_sexpr start_sexpr in
-	let end_sexpr, _ = get_sexpr env end_expr in
-	let end_typ = get_type_from_sexpr end_sexpr in
-	let check_access_types = match lst_typ, start_typ, end_typ with
-		  Lst(_), Int, Int | Lst(_), Int, Void -> true
+	let index_sexpr, _ = get_sexpr env index in
+	let index_typ = get_type_from_sexpr index_sexpr in
+	let check_access_types = match lst_typ, index_typ with
+		  Lst(_), Int -> true
 		| _ -> false
 	in
 
 	(* Unwrap type from list *)
 	let typ = get_type_from_sexpr lst_sexpr in
 	let typ = match typ with
-	  Lst(t) -> t
-	| _ -> raise(Failure("Invalid sequence access."))
+		  Lst(t) -> t
+		| _ -> raise(Failure("Invalid sequence access."))
 	in
 
 	if not check_access_types then
 		(* Invalid type used in sequence access *)
 		raise(Failure("Invalid type used in sequence access: " ^
-		(string_of_typ lst_typ) ^ " " ^
-		(string_of_typ start_typ) ^ " " ^
-		(string_of_typ end_typ)))
+		(string_of_typ lst_typ)))
 	else
-		SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, typ), env *)
+		SSeqAccess(lst_sexpr, index_sexpr, typ), env
 
 and check_field_access env obj field =
 	(* Find class exists *)
@@ -672,8 +630,8 @@ and get_sexpr env expr = match expr with
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
-	(*| LstCreate(exprs) -> check_lst_create env exprs
-	| SeqAccess(lst_expr, start_expr, end_expr) -> 
+	| LstCreate(t, exprs) -> check_lst_create env t exprs
+	(*| SeqAccess(lst_expr, start_expr, end_expr) -> 
 		check_seq_access env lst_expr start_expr end_expr*)
 	| FieldAccess(classid, field) -> check_field_access env classid field
 	| MethodCall(e, str, el) -> check_method_call env e str el
