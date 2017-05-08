@@ -525,14 +525,18 @@ and check_lst_create env typ exprs =
 		| head :: tail ->
 			let typ1 = get_type_from_sexpr head in
 			if typ1 <> Int then (
-				raise(Failure("List dimensions must be int")))
+				raise(Failure("Array dimensions must be int")))
 			else
 				(* Check rest of list *)
 				check_elem_typ (tail)
 	in check_elem_typ sexprs;
 
+	let rec nested_array_typ exprs = match exprs with
+		  [] -> typ
+		| head :: tail -> ArrayTyp(nested_array_typ tail)
+	in
 	(* Make array of type *)
-	SArrayCreate(sexprs, typ), env
+	SArrayCreate(sexprs, nested_array_typ exprs), env
 
 and check_seq_access env lst index =
 	(* Check first expr is a list, second and third are ints *)
@@ -782,6 +786,7 @@ and check_continue env =
 
 (* Verify local var type, add to local declarations *)
 and check_local_var env typ id expr =
+	print_string (string_of_typ typ ^ "\n");
 	if StringMap.mem id env.env_locals || StringMap.mem id env.env_consts then
 		raise(Failure("Duplicate local declaration: " ^ id))
 	else
@@ -815,8 +820,8 @@ and check_local_var env typ id expr =
 				  SNoexpr -> SLocalVar(typ, id, sexpr), env
 				| _ ->
 					(* Check types match *)
-					let typ_expr = get_type_from_sexpr sexpr in
-					if typ = typ_expr then
+					let typ_sexpr = get_type_from_sexpr sexpr in
+					if typ = typ_sexpr then
 						SLocalVar(typ, id, sexpr), env
 					(* Check if assigning a list an untyped list
 					else if valid_untyped_list_assign typ sexpr_typ then
@@ -830,7 +835,7 @@ and check_local_var env typ id expr =
 						SLocalVar(typ, id, typed_list), env*)
 					else
 						raise(Failure("Declared type of " ^ id ^
-						" and assignment type " ^ (string_of_typ) typ_expr ^
+						" and assignment type " ^ string_of_typ typ_sexpr ^
 						" do not match"))
 				)
 				

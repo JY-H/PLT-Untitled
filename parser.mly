@@ -108,7 +108,7 @@ formal_list:
 
 typ:
 	  primitive { $1 }
-	| list_typ	{ $1 }
+	| array_typ	{ $1 }
 	| obj_typ	{ $1 }
 
 return_typ:
@@ -122,7 +122,7 @@ primitive:
 	| STRING	{ String }
 	| FLOAT		{ Float }
 
-list_typ:
+array_typ:
 	LBRACK typ RBRACK	{ ArrayTyp($2) }
 
 obj_typ:
