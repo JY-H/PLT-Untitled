@@ -27,8 +27,7 @@ type expr =
 	| Unop of uop * expr
 	| Assign of expr * expr
 	| Cast of typ * expr
-	| LstCreate of expr list
-	| TupleCreate of expr list
+	| LstCreate of typ * expr list
 	| SeqAccess of expr * expr * expr
 	| FieldAccess of expr * expr
 	| MethodCall of expr * string * expr list
@@ -140,10 +139,15 @@ let rec string_of_expr = function
 	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
 	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
 	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
-	| LstCreate(elems) ->
-		"[" ^ String.concat ", " (List.map string_of_expr elems) ^ "]"
-	| TupleCreate(elems) ->
-		"(" ^ String.concat ", " (List.map string_of_expr elems) ^ ")"
+	| LstCreate(typ, exprs) -> 
+		let rec string_list exprs = match exprs with
+			  [] -> ""
+			| [head] -> "[" ^ (string_of_typ typ) ^ ", " ^
+			  (string_of_expr head) ^ "]"
+			| head :: tail -> "[" ^ (string_list tail) ^ ", " ^ (string_of_expr
+				head) ^ "]"
+		in
+		string_list exprs
 	| SeqAccess(sequence, start_index, end_index) ->
 		string_of_expr sequence ^
 		"[" ^ string_of_expr start_index ^ (match end_index with

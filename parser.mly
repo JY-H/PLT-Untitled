@@ -109,7 +109,6 @@ formal_list:
 typ:
 	  primitive { $1 }
 	| list_typ	{ $1 }
-	| tuple_typ	{ $1 }
 	| obj_typ	{ $1 }
 
 return_typ:
@@ -125,9 +124,6 @@ primitive:
 
 list_typ:
 	LBRACK typ RBRACK	{ Lst($2) }
-
-tuple_typ:
-	LPAREN typ RPAREN	{ Tuple($2) }
 
 obj_typ:
 	CLASSID				{ ClassTyp($1) }
@@ -222,7 +218,7 @@ expr:
 	| LT typ GT expr	{ Cast($2, $4) }
 	| expr ASSIGN expr	{ Assign($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
-	| sequence	{ $1 }
+	| sequence	{ LstCreate(fst $1, snd $1) }
 	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
 	| expr DOT ID	{ FieldAccess($1, Id($3)) }
 	| ID LPAREN actuals_opt RPAREN	{ FuncCall($1, $3) }
@@ -242,18 +238,9 @@ lits:
 	| NULL				{ Null }
 
 sequence:
-	  LPAREN expr COMMA tuple_elems	{ TupleCreate($2 :: $4) }
-	| LBRACK list_elems		{ LstCreate($2) }
-
-tuple_elems:
-	  RPAREN					{ [] }
-	| expr RPAREN				{ [$1] }
-	| expr COMMA tuple_elems	{ $1 :: $3 }
-
-list_elems:
-	  expr RBRACK	{ [$1] }
-	| RBRACK	{ [] }
-	| expr COMMA list_elems	{ $1 :: $3 }
+	  LBRACK sequence COMMA expr RBRACK		{ (fst $2, $4 :: (snd $2)) }
+	| LBRACK primitive COMMA expr RBRACK	{ ($2, [$4]) }
+	| LBRACK obj_typ COMMA expr RBRACK		{ ($2, [$4]) }
 
 sequence_access:
 	  LBRACK expr RBRACK	{ ($2, Noexpr) }
