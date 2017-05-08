@@ -12,7 +12,7 @@ type sexpr =
     | SUnop of uop * sexpr * typ
     | SAssign of sexpr * sexpr * typ
     | SCast of typ * sexpr
-	| SLstCreate of sexpr list * typ
+	| SArrayCreate of sexpr list * typ
 	| SSeqAccess of sexpr * sexpr * typ
     | SFieldAccess of sexpr * sexpr * typ
     | SCall of string * sexpr list * typ

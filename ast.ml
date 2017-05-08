@@ -8,7 +8,7 @@ type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 type uop = Neg | Not | Remove
 
 type typ = Int | Float | Bool | Char | String | Void | Null_t | Any |
-	Tuple of typ | Lst of typ | ClassTyp of string | CharArray of int
+	Tuple of typ | ArrayTyp of typ | ClassTyp of string | CharArray of int
 
 (* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
@@ -27,7 +27,7 @@ type expr =
 	| Unop of uop * expr
 	| Assign of expr * expr
 	| Cast of typ * expr
-	| LstCreate of typ * expr list
+	| ArrayCreate of typ * expr list
 	| SeqAccess of expr * expr
 	| FieldAccess of expr * expr
 	| MethodCall of expr * string * expr list
@@ -94,7 +94,7 @@ let rec string_of_typ = function
 	| Any -> "any"
 	| Char -> "char"
 	| Tuple(t) -> "(" ^ string_of_typ t ^ ")"
-	| Lst(t) -> "[" ^ string_of_typ t ^ "]"
+	| ArrayTyp(t) -> "[" ^ string_of_typ t ^ "]"
 	| ClassTyp(id) -> id
     | CharArray(n) -> "array of length " ^ string_of_int n
 
@@ -139,7 +139,7 @@ let rec string_of_expr = function
 	| Unop(o, e) -> string_of_uop o ^ string_of_expr e
 	| Assign(e1, e2) -> string_of_expr e1 ^ " = " ^ string_of_expr e2
 	| Cast(t, e) -> "<" ^ string_of_typ t ^ ">" ^ string_of_expr e
-	| LstCreate(typ, exprs) -> 
+	| ArrayCreate(typ, exprs) -> 
 		let rec string_list exprs = match exprs with
 			  [] -> ""
 			| [head] -> "[" ^ (string_of_typ typ) ^ ", " ^

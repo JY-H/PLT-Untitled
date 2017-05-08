@@ -273,7 +273,7 @@ let get_type_from_sexpr = function
 	| SUnop(_, _, t) -> t
 	| SAssign(_, _, t) -> t
 	| SCast(t, _) -> t
-	| SLstCreate(_, t) -> t
+	| SArrayCreate(_, t) -> t
 	| SSeqAccess(_, _, t) -> t
 	| SFieldAccess(_, _, t) -> t
 	| SCall(_, _, t) -> t
@@ -372,17 +372,17 @@ and check_unop env op expr =
 (* List assignment helpers *)
 (* Returns true if it is a list type *)
 and is_list typ = match typ with
-	  Lst(_) -> true
+	  ArrayTyp(_) -> true
 	| _ -> false
 (* Returns true if it is an untyped list; false otherwise *)
 (*and is_untyped_list typ = match typ with
-	  Lst(Void) -> true
-	| Lst(inner_typ) -> is_untyped_list inner_typ
+	  ArrayTyp(Void) -> true
+	| ArrayTyp(inner_typ) -> is_untyped_list inner_typ
 	| _ -> false*)
 
 (* Returns the level of nesting in the list *)
 and get_nesting_level lst = match lst with
-	  Lst(inner_typ) -> 1 + get_nesting_level inner_typ
+	  ArrayTyp(inner_typ) -> 1 + get_nesting_level inner_typ
 	| _ -> 1
 
 (* Check assignment, returns SAssign on success *)
@@ -532,7 +532,7 @@ and check_lst_create env typ exprs =
 	in check_elem_typ sexprs;
 
 	(* Make array of type *)
-	SLstCreate(sexprs, typ), env
+	SArrayCreate(sexprs, typ), env
 
 and check_seq_access env lst index =
 	(* Check first expr is a list, second and third are ints *)
@@ -541,14 +541,14 @@ and check_seq_access env lst index =
 	let index_sexpr, _ = get_sexpr env index in
 	let index_typ = get_type_from_sexpr index_sexpr in
 	let check_access_types = match lst_typ, index_typ with
-		  Lst(_), Int -> true
+		  ArrayTyp(_), Int -> true
 		| _ -> false
 	in
 
 	(* Unwrap type from list *)
 	let typ = get_type_from_sexpr lst_sexpr in
 	let typ = match typ with
-		  Lst(t) -> t
+		  ArrayTyp(t) -> t
 		| _ -> raise(Failure("Invalid sequence access."))
 	in
 
@@ -630,7 +630,7 @@ and get_sexpr env expr = match expr with
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
-	| LstCreate(t, exprs) -> check_lst_create env t exprs
+	| ArrayCreate(t, exprs) -> check_lst_create env t exprs
 	(*| SeqAccess(lst_expr, start_expr, end_expr) -> 
 		check_seq_access env lst_expr start_expr end_expr*)
 	| FieldAccess(classid, field) -> check_field_access env classid field
@@ -821,8 +821,8 @@ and check_local_var env typ id expr =
 					(* Check if assigning a list an untyped list
 					else if valid_untyped_list_assign typ sexpr_typ then
 						let typed_list = match sexpr with
-							  SLstCreate(sexprs, _) ->
-								SLstCreate(sexprs, typ)
+							  SArrayCreate(sexprs, _) ->
+								SArrayCreate(sexprs, typ)
 							| _ -> raise(Failure("Cannot assign " ^
 								(string_of_typ sexpr_typ) ^ " to " ^
 								(string_of_typ typ) ^ "\n"))

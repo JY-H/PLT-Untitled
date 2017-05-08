@@ -123,7 +123,7 @@ primitive:
 	| FLOAT		{ Float }
 
 list_typ:
-	LBRACK typ RBRACK	{ Lst($2) }
+	LBRACK typ RBRACK	{ ArrayTyp($2) }
 
 obj_typ:
 	CLASSID				{ ClassTyp($1) }
@@ -218,7 +218,7 @@ expr:
 	| LT typ GT expr	{ Cast($2, $4) }
 	| expr ASSIGN expr	{ Assign($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
-	| sequence	{ LstCreate(fst $1, snd $1) }
+	| sequence	{ ArrayCreate(fst $1, snd $1) }
 	| expr sequence_access	{ SeqAccess($1, $2) }
 	| expr DOT ID	{ FieldAccess($1, Id($3)) }
 	| ID LPAREN actuals_opt RPAREN	{ FuncCall($1, $3) }
