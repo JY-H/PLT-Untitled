@@ -635,8 +635,8 @@ and get_sexpr env expr = match expr with
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
 	| ArrayCreate(t, exprs) -> check_lst_create env t exprs
-	(*| SeqAccess(lst_expr, start_expr, end_expr) -> 
-		check_seq_access env lst_expr start_expr end_expr*)
+	| SeqAccess(lst_expr, index) -> 
+		check_seq_access env lst_expr index
 	| FieldAccess(classid, field) -> check_field_access env classid field
 	| MethodCall(e, str, el) -> check_method_call env e str el
 	(* does not work on class whose field is a class e.g. a.b.method(), fixable by recursively processing e in check_func_call *)
@@ -786,7 +786,6 @@ and check_continue env =
 
 (* Verify local var type, add to local declarations *)
 and check_local_var env typ id expr =
-	print_string (string_of_typ typ ^ "\n");
 	if StringMap.mem id env.env_locals || StringMap.mem id env.env_consts then
 		raise(Failure("Duplicate local declaration: " ^ id))
 	else
@@ -888,10 +887,6 @@ and get_sstmt env stmt = match stmt with
 	| Continue -> check_continue env
 	| LocalVar(typ, id, expr) -> check_local_var env typ id expr
 	| LocalConst(typ, id, expr) -> check_local_const env typ id expr
-(*			  | TryCatch
-	|
-	| Throw
-	*)
 	| _ -> raise(Failure("Idk what stmt you are talking abt"))
 
 and get_sstmtl env stmtl =

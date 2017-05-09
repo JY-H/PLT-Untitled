@@ -1,0 +1,33 @@
+class Animal {
+	string name;
+	int legs;
+	bool tail;
+
+	Animal(string n, int l, bool t) -> Animal {
+		self.name = n;
+		self.legs = l;
+		self.tail = t;
+	}
+
+	talk() -> void {
+		print_string(self.name);
+		print_string(" says hi\n");
+	}
+}
+
+main() -> int {
+	Animal cat = Animal("Amy", 3, true);
+	Animal cat2 = Animal("Peter", 3, true);
+	Animal cat3 = Animal("Bob", 3, true);
+	[Animal] arr = [Animal, 3];
+	arr[0] = cat;
+	arr[1] = cat2;
+	arr[2] = cat3;
+	int i;
+	for (i=0;i<3;i=i+1){
+		Animal cur = arr[i];
+		cur.talk();
+	}
+
+	return 0;
+}

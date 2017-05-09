@@ -48,8 +48,7 @@ let rec get_llvm_type = function
 	| A.Void -> void_t
 	| A.String -> str_t
 	| A.Null_t -> i32_t
-	(* TODO: Add tuple/list types 
-	| A.Lst(typ) -> L.pointer_type (get_llvm_type typ) *)
+	| A.ArrayTyp(typ) -> L.pointer_type (get_llvm_type typ)
 	| A.ClassTyp(name) -> L.pointer_type(find_global_class name)
 	| _ -> raise(Failure("Type not yet supported."))
 
@@ -111,9 +110,9 @@ and sexpr_gen llbuilder = function
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
-	(*| SLstCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
-	| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, _) ->
-		seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr false*)
+	| SArrayCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
+	| SSeqAccess(lst_sexpr, index, typ) ->
+		seq_access_gen llbuilder lst_sexpr index false
 	| SFieldAccess(c, rhs, _) -> field_access_gen llbuilder c rhs true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
 	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
@@ -142,7 +141,7 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
 		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
 				| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
-				(*I think several others are missing, like or*)
+                                | A.Or -> L.build_or expr1 expr2 "int_ortmp" llbuilder
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
@@ -254,9 +253,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
-		(* TODO: add functionality  for tuples, etc.
-		| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, _) ->
-			seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr true, false*)
+		| SSeqAccess(lst_sexpr, index,  _) ->
+			seq_access_gen llbuilder lst_sexpr index true, true
 		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field false, true
 		| _ -> raise(Failure("Unable to assign."))
 	in
@@ -282,33 +280,32 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
 
-(* written only for 1D lists atm
- * multiple dimensions may work since LstCreate is processed recursively? llvm code looks kinda promising, but we can only tell after access is implemented *)
-(* I don't think we should mul here; build_array_malloc should malloc len * sizeof(typ) it seems from llvm code generated 
 and lst_create_gen llbuilder t sexprl =
-	let len_real = L.const_int i32_t ((List.length sexprl) + 1) in
-	let typ = get_llvm_type t in
-	let lst = L.build_array_malloc typ len_real "tmp" llbuilder in
-	let lst = L.build_pointercast lst typ "tmp"
+        let e = List.hd sexprl in
+        let t = get_llvm_type t in
+        let size = sexpr_gen llbuilder e in
+        let size_t = L.build_intcast (L.size_of t) i32_t "tmp" llbuilder in
+        let size = L.build_mul size_t size "tmp" llbuilder in
+        let size_real = L.build_add size (L.const_int i32_t 1) "tmp" llbuilder in
+	let arr = L.build_array_malloc t size_real "tmp" llbuilder in
+	let arr = L.build_pointercast arr (*L.pointer_type*) t "tmp"
 	llbuilder in
-	let llvalues = List.map (sexpr_gen llbuilder) sexprl in
-	List.iteri (fun i llval -> let ptr = L.build_gep lst [|(L.const_int i32_t (i+1))|] "tmp"
-	llbuilder in
-	ignore(L.build_store llval ptr llbuilder); ) llvalues;
-	lst
+        (* store this dimension *)
+        let arr_len_ptr = L.build_pointercast arr (L.pointer_type i32_t) "tmp" llbuilder in
+        ignore(L.build_store size_real arr_len_ptr llbuilder);
+        arr
 
 (* Access a list *)
-and seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr is_assign =
+and seq_access_gen llbuilder lst_sexpr index is_assign =
 	let lst = sexpr_gen llbuilder lst_sexpr in
-	let start_index = sexpr_gen llbuilder start_sexpr in
-	(* TODO: list splicing *)
-	let start_index = L.build_add start_index (L.const_int i32_t 1) "list_index"
+	let sindex = sexpr_gen llbuilder index in
+	let sindex = L.build_add sindex (L.const_int i32_t 1) "list_index"
 		llbuilder in
-	let _val = L.build_gep lst [| start_index |] "list_access" llbuilder in
+	let _val = L.build_gep lst [| sindex |] "list_access" llbuilder in
 	if is_assign then
 		_val
 	else
-		L.build_load _val "list_access_val" llbuilder *)
+		L.build_load _val "list_access_val" llbuilder
 
 and field_access_gen llbuilder id rhs isAssign =
 	let check_id id =
@@ -609,7 +606,7 @@ and local_var_gen llbuilder typ id sexpr =
 		  A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
 			find_global_class classname, false
-		| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
+                | _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
 
@@ -693,15 +690,9 @@ let class_gen s =
 	let res = List.map (fun f -> func_body_gen f) s.scbody.smethods in
 		res
 
-
-(*TBA: probably needed when inheritance happens
-let vtbl_gen scdecls =
-			*)
-
 let translate sprogram =
 	let _ = construct_library_functions in
 		let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) sprogram.classes else [] in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
-		(*		  let _ = vtbl_gen sprogram.classes in*)
 	codegen_module
