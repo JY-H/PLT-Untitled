@@ -188,20 +188,15 @@ and unop_gen llbuilder unop sexpr typ =
 		| _ -> raise(Failure("Invalid type for unop: " ^ A.string_of_typ typ))
 
 and cast_gen llbuilder to_typ sexpr =
-	(* TODO: check this is legit *)
 	let lexpr = sexpr_gen llbuilder sexpr in
 	let from_typ = get_type_from_sexpr sexpr in
 	match from_typ with
 		  A.Bool -> (
 			match to_typ with
 			  A.Bool -> lexpr
+			| A.Char -> L.build_zext lexpr i8_t "bool_char_cast" llbuilder
 			| A.Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
-			(* NOTE: questionable implementation *)
 			| A.Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
-			(* NOTE: non-working implementation unless arrays are used *)
-			(*| String ->
-				L.build_global_stringptr (A.string_of_lval lexpr)
-				"bool_string_cast" llbuilder*)
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
@@ -211,40 +206,32 @@ and cast_gen llbuilder to_typ sexpr =
 				let zero = L.const_int i32_t 0 in
 				L.build_icmp L.Icmp.Ne lexpr zero "int_bool_cast" llbuilder
 			| A.Char -> L.build_trunc lexpr i8_t "int_char_cast" llbuilder
-			(* NOTE: questionable implementation *)
 			| A.Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
-			(* NOTE: non-working implementation unless arrays are used *)
-			(*| String
-				L.build_global_stringptr (A.string_of_lval lexpr)
-				"int_string_cast" llbuilder*)
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
 		| A.Float -> (match to_typ with
 			  A.Float -> lexpr
+			| A.Char -> L.build_fptoui lexpr i8_t "float_char_cast" llbuilder
 			| A.Bool ->
 				let zero = L.const_float f_t 0.0 in
 				L.build_fcmp L.Fcmp.One lexpr zero "float_bool_cast" llbuilder
-			(* NOTE: questionable implementation *)
 			| A.Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
-			(* NOTE: non-working implementation unless arrays are used *)
-			(*| A.String ->
-				L.build_global_stringptr (A.string_of_lval lexpr)
-				"float_string_cast" llbuilder*)
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
 		| A.Char -> (match to_typ with
 			  A.Char -> lexpr
+			| A.Bool ->
+				let zero = L.const_int i8_t 0 in
+				L.build_icmp L.Icmp.Ne lexpr zero "char_bool_cast" llbuilder
 			| A.Int -> L.build_zext lexpr i32_t "char_int_cast" llbuilder
-			(* TODO: string conversion when strings exist *)
+			| A.Float -> L.build_uitofp lexpr f_t "char_float_cast" llbuilder
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
-		(* TODO; string conversion when strings exist *)
 		| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 			" to " ^ A.string_of_typ to_typ))
-	(* TODO: cast objects when objects are a thing *)
 
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
@@ -391,7 +378,7 @@ and func_call_gen llbuilder fname sexprl stype =
 and call_gen llbuilder fname sexprl stype =
 		match fname with
 				(* full list of built-in and linked functions just for clarity*)
-				 "print_string" | "print_int" | "print_float" ->
+				 "print_string" | "print_int" | "print_float" | "print_char" ->
 					print_gen llbuilder sexprl
 				| "malloc" -> func_call_gen llbuilder fname sexprl stype
 				| "cast" -> cast_malloc_gen llbuilder sexprl stype
@@ -406,7 +393,7 @@ and print_gen llbuilder sexpr_list =
 		  A.Int -> "%d"
 		| A.Float -> "%f"
 		| A.String -> "%s"
-		(* char ?? *)
+		| A.Char -> "%c"
 		| _ -> raise (Failure("cannot print type " ^ A.string_of_typ typ))
 	in
 	let format_str = List.fold_left (fun s t -> s ^ get_format t) "" param_types in

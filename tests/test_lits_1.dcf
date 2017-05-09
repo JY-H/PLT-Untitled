@@ -1,9 +1,14 @@
 main() -> int {
-	5 + 3;
-	5 * 3;
-	5.0 / 3.0;
-	5 % 3;
-	'c';
-	"s";
+	print_int(5 + 3);
+	print_string("\n");
+	print_int(5 * 3);
+	print_string("\n");
+	print_float(5.0 / 3.0);
+	print_string("\n");
+	print_int(5 % 3);
+	print_string("\n");
+	print_char('c');
+	print_string("\n");
+	print_string("s");
 	return 0;
 }

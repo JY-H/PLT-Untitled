@@ -2,5 +2,10 @@ main() -> int {
 	int x = <int> 5;
 	bool b = <bool> 5;
 	float f = <float> 5;
+
+	print_int(x);
+	print_string("\n");
+	print_float(f);
+
 	return 0;
 }

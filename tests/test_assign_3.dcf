@@ -3,7 +3,9 @@ main() -> int {
 	x = 5;
 	int y;
 	y = 3;
-	x + y;
 	x = x * y;
+	print_int(x);
+	print_string("\n");
+	print_int(y);
 	return 0;
 }

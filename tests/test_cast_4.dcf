@@ -1,6 +1,26 @@
+/* More extensive testing of int -> bool conversion */
 main() -> int {
-	bool b = <bool> true;
-	int i = <int> true;
-	float f = <float> true;
+	int i;
+	if (not <bool>i) {
+		print_string("yes\n");
+	}
+
+	for (i = 1; i < 10; i = i + 1) {
+		if (not <bool>i) {
+			print_string("no\n");
+		}
+		else {
+			print_string("yes\n");
+		}
+	}
+
+	for (i = -1; i > -10; i = i - 1) {
+		if (not <bool>i) {
+			print_string("no\n");
+		}
+		else {
+			print_string("yes\n");
+		}
+	}
 	return 0;
 }
