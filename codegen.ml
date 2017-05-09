@@ -280,9 +280,9 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
 
-and lst_create_gen llbuilder t sexprl =
+and lst_create_gen llbuilder typ sexprl =
         let e = List.hd sexprl in
-        let t = get_llvm_type t in
+        let t = get_llvm_type typ in
         let size = sexpr_gen llbuilder e in
         let size_t = L.build_intcast (L.size_of t) i32_t "tmp" llbuilder in
         let size = L.build_mul size_t size "tmp" llbuilder in
@@ -395,7 +395,14 @@ and call_gen llbuilder fname sexprl stype =
 					print_gen llbuilder sexprl
 				| "malloc" -> func_call_gen llbuilder fname sexprl stype
 				| "cast" -> cast_malloc_gen llbuilder sexprl stype
+                                | "sizeof" -> sizeof_gen llbuilder sexprl
 				| _ -> func_call_gen llbuilder fname sexprl stype
+
+and sizeof_gen llbuilder el =
+        let typ = Se.get_type_from_sexpr (List.hd el) in
+        let typ = get_llvm_type typ in
+        let size = L.size_of typ in
+        L.build_bitcast size i32_t "tmp" llbuilder
 
 (* Helper method to generate print function for strings. *)
 and print_gen llbuilder sexpr_list =

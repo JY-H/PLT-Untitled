@@ -979,7 +979,7 @@ let get_constructor_from_fdecl cname fdecl env =
     let class_typ = ClassTyp(cname) in
     let init_self = [SLocalVar(class_typ, "self",
         SCall("cast", 
-            [SCall("malloc", [SIntLit(100)], CharArray(100))], (*100 dummy, should be sizeof*)
+            [SCall("malloc", [SCall("sizeof", [SId("dummy", class_typ)], Int)], CharArray(1))],
             class_typ))]
     in
     let env = {
