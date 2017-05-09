@@ -133,6 +133,7 @@ let reserved_list =
 		reserved_struct "print_string" (Void) ([Formal(String, "string_arg")]);
 		reserved_struct "print_int" (Void) ([Formal(Int, "int_arg")]);
 		reserved_struct "print_float" (Void) ([Formal(Float, "float_arg")]);
+		reserved_struct "print_char" (Void) ([Formal(Char, "char_arg")]);
 		reserved_struct "malloc" (CharArray(1)) ([Formal(Int, "size")]);
 		reserved_struct "cast" (Any) ([Formal(Any, "victim")]);
 	] in reserved
@@ -498,22 +499,25 @@ and check_cast env to_typ expr =
 	(* Check cast is valid from_typ -> to_typ *)
 	let scast = match from_typ with
 		  Bool -> (match to_typ with
-			  Bool | Int | Float | String -> SCast(to_typ, sexpr)
+			  Bool | Char | Int | Float -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
 		| Int -> (match to_typ with
-			  Int | Bool | Float | String | Char -> SCast(to_typ, sexpr)
+			  Int | Bool | Float | Char -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
 		| Float -> (match to_typ with
-			  Float | Bool | Int | String  -> SCast(to_typ, sexpr)
+			  Float | Bool | Char | Int -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
-		| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^ " to " ^
-			string_of_typ to_typ))
+		| Char -> (match to_typ with
+			  Char | Bool | Int | Float -> SCast(to_typ, sexpr)
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+		)
 	in
 	scast, env
 
