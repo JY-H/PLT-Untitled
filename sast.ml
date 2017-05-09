@@ -16,7 +16,7 @@ type sexpr =
 	| SSeqAccess of sexpr * sexpr * typ
     | SFieldAccess of sexpr * sexpr * typ
     | SCall of string * sexpr list * typ
-    | SMethodCall of sexpr * string * sexpr list * typ (* currently first is SId(obj, obj_typ), last typ is return_typ; to support chained obj method calls like a.b.hello() sexpr should be generalized in semant.ml *)
+    | SMethodCall of sexpr * string * sexpr list * typ
     | SObjCreate of typ * sexpr list
     | SNoexpr
 
@@ -48,7 +48,6 @@ type sclass_body = {
 type sclass_decl = {
     scname: string;
     scbody: sclass_body;
-    (* TODO: add subclasses and interfaces somewhere. *)
 }
 
 type sprogram = {

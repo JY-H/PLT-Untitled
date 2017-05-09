@@ -81,7 +81,7 @@ and string_gen llbuilder s =
 	L.build_global_stringptr s "tmp" llbuilder
 
 and sstmt_gen llbuilder loop_stack = function
-	(* NOTE: this requires a function body to be non-empty, is this ok? *)
+	(* NOTE: this requires a function body to be non-empty *)
 	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder loop_stack) stmts)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
 	| SReturn(sexpr, _) -> ret_gen llbuilder sexpr
@@ -111,20 +111,18 @@ and sexpr_gen llbuilder = function
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
 	| SArrayCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
-	| SSeqAccess(lst_sexpr, index, typ) ->
+	| SSeqAccess(lst_sexpr, index, _) ->
 		seq_access_gen llbuilder lst_sexpr index false
 	| SFieldAccess(c, rhs, _) -> field_access_gen llbuilder c rhs true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
 	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
 	| SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
 	| SNoexpr -> L.const_int i32_t 0
-	| _ -> raise(Failure("Expression type not recognized.")) 
 
 and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	let lexpr1 = sexpr_gen llbuilder sexpr1 in
 	let lexpr2 = sexpr_gen llbuilder sexpr2 in
 
-	(* KILL_ME: kill this if unused by end of project *)
 	let typ1 = get_type_from_sexpr sexpr1 in
 	let typ2 = get_type_from_sexpr sexpr2 in
 
@@ -160,8 +158,6 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| _ -> raise(Failure("Unsupported operator for floats"))
 	in
 
-	(* TODO: do something for req/rneq here *)
-	
 	match typ with
 		  A.Int -> int_ops lexpr1 op lexpr2
 		| A.Float -> float_ops lexpr1 op lexpr2
@@ -235,8 +231,6 @@ and cast_gen llbuilder to_typ sexpr =
 
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
-	(* KILL_ME: kill this if unused by end of project *)
-	(*let rhs_typ = get_type_from_sexpr sexpr2 in*)
 
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
@@ -275,7 +269,7 @@ and lst_create_gen llbuilder typ sexprl =
         let size = L.build_mul size_t size "tmp" llbuilder in
         let size_real = L.build_add size (L.const_int i32_t 1) "tmp" llbuilder in
 	let arr = L.build_array_malloc t size_real "tmp" llbuilder in
-	let arr = L.build_pointercast arr (*L.pointer_type*) t "tmp"
+	let arr = L.build_pointercast arr t "tmp"
 	llbuilder in
         (* store this dimension *)
         let arr_len_ptr = L.build_pointercast arr (L.pointer_type i32_t) "tmp" llbuilder in
@@ -423,9 +417,6 @@ and ret_gen llbuilder sexpr =
 			L.build_ret (sexpr_gen llbuilder sexpr) llbuilder
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
-	(* if expr *)
-	(* KILL_ME *)
-	(*let if_lexpr = sexpr_gen llbuilder if_sexpr in*)
 
 	(* Initial bb *)
 	let start_bb = L.insertion_block llbuilder in
