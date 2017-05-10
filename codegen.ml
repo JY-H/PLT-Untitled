@@ -82,7 +82,8 @@ and string_gen llbuilder s =
 
 and sstmt_gen llbuilder loop_stack = function
 	(* NOTE: this requires a function body to be non-empty *)
-	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder loop_stack) stmts)
+	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder loop_stack)
+		stmts)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
 	| SReturn(sexpr, _) -> ret_gen llbuilder sexpr
 	| SIf(if_sexpr, if_stmts, elseifs, else_sstmts) ->
@@ -114,8 +115,11 @@ and sexpr_gen llbuilder = function
 	| SSeqAccess(lst_sexpr, index, _) ->
 		seq_access_gen llbuilder lst_sexpr index false
 	| SFieldAccess(c, rhs, _) -> field_access_gen llbuilder c rhs true
-	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
-	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
+	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list
+		stype
+	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen
+		llbuilder sexpr fname sexpr_list stype
+		(* difference is insert self as the first argument *)
 	| SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
 	| SNoexpr -> L.const_int i32_t 0
 
@@ -133,13 +137,18 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Div -> L.build_sdiv expr1 expr2 "int_divop" llbuilder
 		| A.Mod -> L.build_srem expr1 expr2 "int_modop" llbuilder
 		| A.Veq -> L.build_icmp L.Icmp.Eq expr1 expr2 "int_eqtmp" llbuilder
-		| A.Vneq -> L.build_icmp L.Icmp.Ne expr1 expr2 "int_neqtmp" llbuilder
-		| A.Less -> L.build_icmp L.Icmp.Slt expr1 expr2 "int_lesstmp" llbuilder
-		| A.Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp" llbuilder
-		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
-		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
-				| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
-                                | A.Or -> L.build_or expr1 expr2 "int_ortmp" llbuilder
+		| A.Vneq -> L.build_icmp L.Icmp.Ne expr1 expr2 "int_neqtmp"
+			llbuilder
+		| A.Less -> L.build_icmp L.Icmp.Slt expr1 expr2 "int_lesstmp"
+			llbuilder
+		| A.Leq -> L.build_icmp L.Icmp.Sle expr1 expr2 "int_leqtmp"
+			llbuilder
+		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp"
+			llbuilder
+		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp"
+			llbuilder
+		| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
+		| A.Or -> L.build_or expr1 expr2 "int_ortmp" llbuilder
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
@@ -150,11 +159,16 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Div -> L.build_fdiv expr1 expr2 "flt_divop" llbuilder
 		| A.Mod -> L.build_frem expr1 expr2 "flt_modop" llbuilder
 		| A.Veq -> L.build_fcmp L.Fcmp.Oeq expr1 expr2 "flt_eqtmp" llbuilder
-		| A.Vneq -> L.build_fcmp L.Fcmp.One expr1 expr2 "flt_neqtmp" llbuilder
-		| A.Less -> L.build_fcmp L.Fcmp.Olt expr1 expr2 "flt_lesstmp" llbuilder
-		| A.Leq -> L.build_fcmp L.Fcmp.Ole expr1 expr2 "flt_leqtmp" llbuilder
-		| A.Greater -> L.build_fcmp L.Fcmp.Ogt expr1 expr2 "flt_greatertmp" llbuilder
-		| A.Geq -> L.build_fcmp L.Fcmp.Oge expr1 expr2 "flt_geqtmp" llbuilder
+		| A.Vneq -> L.build_fcmp L.Fcmp.One expr1 expr2 "flt_neqtmp"
+			llbuilder
+		| A.Less -> L.build_fcmp L.Fcmp.Olt expr1 expr2 "flt_lesstmp"
+			llbuilder
+		| A.Leq -> L.build_fcmp L.Fcmp.Ole expr1 expr2 "flt_leqtmp"
+			llbuilder
+		| A.Greater -> L.build_fcmp L.Fcmp.Ogt expr1 expr2 "flt_greatertmp"
+			llbuilder
+		| A.Geq -> L.build_fcmp L.Fcmp.Oge expr1 expr2 "flt_geqtmp"
+			llbuilder
 		| _ -> raise(Failure("Unsupported operator for floats"))
 	in
 
@@ -181,7 +195,8 @@ and unop_gen llbuilder unop sexpr typ =
 
 	match typ with
 		  A.Int | A.Float | A.Bool -> build_unop unop typ unop_lval
-		| _ -> raise(Failure("Invalid type for unop: " ^ A.string_of_typ typ))
+		| _ -> raise(Failure("Invalid type for unop: " ^ A.string_of_typ
+			typ))
 
 and cast_gen llbuilder to_typ sexpr =
 	let lexpr = sexpr_gen llbuilder sexpr in
@@ -192,9 +207,10 @@ and cast_gen llbuilder to_typ sexpr =
 			  A.Bool -> lexpr
 			| A.Char -> L.build_zext lexpr i8_t "bool_char_cast" llbuilder
 			| A.Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
-			| A.Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
-				" to " ^ A.string_of_typ to_typ))
+			| A.Float -> L.build_uitofp lexpr f_t "bool_float_cast"
+				llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ
+				from_typ ^ " to " ^ A.string_of_typ to_typ))
 			)
 		| A.Int -> (match to_typ with
 			  A.Int -> lexpr
@@ -203,18 +219,20 @@ and cast_gen llbuilder to_typ sexpr =
 				L.build_icmp L.Icmp.Ne lexpr zero "int_bool_cast" llbuilder
 			| A.Char -> L.build_trunc lexpr i8_t "int_char_cast" llbuilder
 			| A.Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
-				" to " ^ A.string_of_typ to_typ))
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ
+				from_typ ^ " to " ^ A.string_of_typ to_typ))
 			)
 		| A.Float -> (match to_typ with
 			  A.Float -> lexpr
-			| A.Char -> L.build_fptoui lexpr i8_t "float_char_cast" llbuilder
+			| A.Char -> L.build_fptoui lexpr i8_t "float_char_cast"
+				llbuilder
 			| A.Bool ->
 				let zero = L.const_float f_t 0.0 in
-				L.build_fcmp L.Fcmp.One lexpr zero "float_bool_cast" llbuilder
+				L.build_fcmp L.Fcmp.One lexpr zero "float_bool_cast"
+					llbuilder
 			| A.Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
-				" to " ^ A.string_of_typ to_typ))
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ
+				from_typ ^ " to " ^ A.string_of_typ to_typ))
 			)
 		| A.Char -> (match to_typ with
 			  A.Char -> lexpr
@@ -222,12 +240,13 @@ and cast_gen llbuilder to_typ sexpr =
 				let zero = L.const_int i8_t 0 in
 				L.build_icmp L.Icmp.Ne lexpr zero "char_bool_cast" llbuilder
 			| A.Int -> L.build_zext lexpr i32_t "char_int_cast" llbuilder
-			| A.Float -> L.build_uitofp lexpr f_t "char_float_cast" llbuilder
-			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
-				" to " ^ A.string_of_typ to_typ))
+			| A.Float -> L.build_uitofp lexpr f_t "char_float_cast"
+				llbuilder
+			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ
+				from_typ ^ " to " ^ A.string_of_typ to_typ))
 			)
-		| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
-			" to " ^ A.string_of_typ to_typ))
+		| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ
+			^ " to " ^ A.string_of_typ to_typ))
 
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
@@ -236,7 +255,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 		  SId(id, _) -> id_gen llbuilder id false, false
 		| SSeqAccess(lst_sexpr, index,  _) ->
 			seq_access_gen llbuilder lst_sexpr index true, true
-		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field false, true
+		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field
+			false, true
 		| _ -> raise(Failure("Unable to assign."))
 	in
 
@@ -244,7 +264,8 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 		  SId(id, typ) -> (match typ with
 			  A.ClassTyp(_) -> id_gen llbuilder id false
 			| _ -> id_gen llbuilder id true)
-		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field true
+		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field
+			true
 		| _ -> sexpr_gen llbuilder sexpr2
 	in
 
@@ -262,19 +283,21 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	rhs
 
 and lst_create_gen llbuilder typ sexprl =
-        let e = List.hd sexprl in
-        let t = get_llvm_type typ in
-        let size = sexpr_gen llbuilder e in
-        let size_t = L.build_intcast (L.size_of t) i32_t "tmp" llbuilder in
-        let size = L.build_mul size_t size "tmp" llbuilder in
-        let size_real = L.build_add size (L.const_int i32_t 1) "tmp" llbuilder in
+	let e = List.hd sexprl in
+	let t = get_llvm_type typ in
+	let size = sexpr_gen llbuilder e in
+	let size_t = L.build_intcast (L.size_of t) i32_t "tmp" llbuilder in
+	let size = L.build_mul size_t size "tmp" llbuilder in
+	let size_real = L.build_add size (L.const_int i32_t 1) "tmp" llbuilder
+	in
 	let arr = L.build_array_malloc t size_real "tmp" llbuilder in
 	let arr = L.build_pointercast arr t "tmp"
 	llbuilder in
-        (* store this dimension *)
-        let arr_len_ptr = L.build_pointercast arr (L.pointer_type i32_t) "tmp" llbuilder in
-        ignore(L.build_store size_real arr_len_ptr llbuilder);
-        arr
+	(* store this dimension *)
+	let arr_len_ptr = L.build_pointercast arr (L.pointer_type i32_t) "tmp"
+		llbuilder in
+		ignore(L.build_store size_real arr_len_ptr llbuilder);
+		arr
 
 (* Access a list *)
 and seq_access_gen llbuilder lst_sexpr index is_assign =
@@ -304,8 +327,12 @@ and field_access_gen llbuilder id rhs isAssign =
 			let field_index = Hash.find class_fields field_name in
 			let _val = L.build_struct_gep par_exp field_index s llbuilder in
 			let _val = match d with
-				A.ClassTyp(_) -> if isAssign then L.build_load _val s llbuilder else _val
-				| _ -> if isAssign then L.build_load _val s llbuilder else _val
+				  A.ClassTyp(_) ->
+					if isAssign then L.build_load _val s llbuilder
+					else _val
+				| _ ->
+					if isAssign then L.build_load _val s llbuilder
+					else _val
 			in
 			_val
 		| SCall(fname, exprl, ftyp) -> call_gen llbuilder fname exprl ftyp
@@ -371,19 +398,19 @@ and func_call_gen llbuilder fname sexprl stype =
 
 and call_gen llbuilder fname sexprl stype =
 		match fname with
-				(* full list of built-in and linked functions just for clarity*)
-				 "print_string" | "print_int" | "print_float" | "print_char" ->
+			(* full list of built-in and linked functions just for clarity*)
+			  "print_string" | "print_int" | "print_float" | "print_char" ->
 					print_gen llbuilder sexprl
-				| "malloc" -> func_call_gen llbuilder fname sexprl stype
-				| "cast" -> cast_malloc_gen llbuilder sexprl stype
-                                | "sizeof" -> sizeof_gen llbuilder sexprl
-				| _ -> func_call_gen llbuilder fname sexprl stype
+			| "malloc" -> func_call_gen llbuilder fname sexprl stype
+			| "cast" -> cast_malloc_gen llbuilder sexprl stype
+			| "sizeof" -> sizeof_gen llbuilder sexprl
+			| _ -> func_call_gen llbuilder fname sexprl stype
 
 and sizeof_gen llbuilder el =
-        let typ = Se.get_type_from_sexpr (List.hd el) in
-        let typ = get_llvm_type typ in
-        let size = L.size_of typ in
-        L.build_bitcast size i32_t "tmp" llbuilder
+	let typ = Se.get_type_from_sexpr (List.hd el) in
+	let typ = get_llvm_type typ in
+	let size = L.size_of typ in
+	L.build_bitcast size i32_t "tmp" llbuilder
 
 (* Helper method to generate print function for strings. *)
 and print_gen llbuilder sexpr_list =
@@ -397,7 +424,8 @@ and print_gen llbuilder sexpr_list =
 		| A.Char -> "%c"
 		| _ -> raise (Failure("cannot print type " ^ A.string_of_typ typ))
 	in
-	let format_str = List.fold_left (fun s t -> s ^ get_format t) "" param_types in
+	let format_str = List.fold_left (fun s t -> s ^ get_format t) ""
+		param_types in
 	let str = sexpr_gen llbuilder (SStringLit(format_str)) in
 		let zero = L.const_int i32_t 0 in
 		let s = L.build_in_bounds_gep str [| zero |] "tmp" llbuilder in
@@ -406,15 +434,16 @@ and print_gen llbuilder sexpr_list =
 
 and ret_gen llbuilder sexpr =
 	match sexpr with
-		  SId(name, t) ->
-					 (match t with
-					 | A.ClassTyp(_) -> L.build_ret (id_gen llbuilder name false) llbuilder
-					 | _ -> L.build_ret (id_gen llbuilder name true) llbuilder)
-				| SFieldAccess(e1, e2, _) -> L.build_ret (field_access_gen llbuilder e1 e2 true) llbuilder
-				| SNoexpr ->
-			L.build_ret_void llbuilder
-		| _ ->
-			L.build_ret (sexpr_gen llbuilder sexpr) llbuilder
+		  SId(name, t) -> (
+			match t with
+				| A.ClassTyp(_) -> L.build_ret (id_gen llbuilder name false)
+					llbuilder
+				| _ -> L.build_ret (id_gen llbuilder name true) llbuilder
+		  )
+		| SFieldAccess(e1, e2, _) -> L.build_ret (field_access_gen llbuilder
+			e1 e2 true) llbuilder
+		| SNoexpr -> L.build_ret_void llbuilder
+		| _ -> L.build_ret (sexpr_gen llbuilder sexpr) llbuilder
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 
@@ -438,7 +467,8 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 		| head :: tail ->
 			let selseif = match head with
 				  SElseif(sexpr, sstmt) -> (sexpr, sstmt)
-				| _ -> raise(Failure("Unexpected non-elseif in elseif list"))
+				| _ ->
+					raise(Failure("Unexpected non-elseif in elseif list"))
 			in
 			let elseif_sexpr, elseif_sstmts = selseif in
 
@@ -479,7 +509,8 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 	L.position_at_end start_bb llbuilder;
 	ignore(L.build_br if_bb llbuilder);
 
-	(* Go to start bb and add conditional branch to next conditional block *)
+	(* Go to start bb and add conditional branch to next conditional
+	 * block *)
 	let rec build_cond_brs if_elseif_bbs = match if_elseif_bbs with
 		  head :: next :: tail ->
 			let head_sexpr, head_bb, head_body_bb, _ = head in
@@ -488,7 +519,8 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 			(* Build expr for cond br, then build cond br *)
 			L.position_at_end head_bb llbuilder;
 			let head_lexpr = sexpr_gen llbuilder head_sexpr in
-			ignore(L.build_cond_br head_lexpr head_body_bb next_bb llbuilder);
+			ignore(L.build_cond_br head_lexpr head_body_bb next_bb
+				llbuilder);
 
 			build_cond_brs (next :: tail)
 		| head :: _ ->
@@ -496,7 +528,8 @@ and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
 
 			L.position_at_end head_bb llbuilder;
 			let head_lexpr = sexpr_gen llbuilder head_sexpr in
-			ignore(L.build_cond_br head_lexpr head_body_bb else_body_bb llbuilder)
+			ignore(L.build_cond_br head_lexpr head_body_bb else_body_bb
+				llbuilder)
 		| [] -> ()
 	in
 	build_cond_brs if_elseif_bbs;
@@ -591,7 +624,7 @@ and local_var_gen llbuilder typ id sexpr =
 		  A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
 			find_global_class classname, false
-                | _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
+		| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
 
@@ -635,7 +668,8 @@ let func_stub_gen sfdecl =
 			[] sfdecl.sformals
 		)
 	in
-	let stype = L.function_type (get_llvm_type sfdecl.stype) (Array.of_list param_types)
+	let stype = L.function_type (get_llvm_type sfdecl.stype) (Array.of_list 
+		param_types)
 	in
 	L.define_function sfdecl.sfname stype codegen_module
 
@@ -678,7 +712,8 @@ let class_gen s =
 let translate sprogram =
 	let _ = construct_library_functions in
 	let classes = List.rev sprogram.classes in
-	let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) classes else [] in
+	let _ = if (List.length sprogram.classes > 0) then List.map
+		(fun s -> class_gen s) classes else [] in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
 	codegen_module
