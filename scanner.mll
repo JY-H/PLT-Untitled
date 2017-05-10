@@ -12,7 +12,7 @@ let escape = '\\' ['\\' ''' '"' 'n' 'r' 't']
 
 rule token = parse
 	  [' ' '\t' '\r' '\n'] { token lexbuf } (* Whitespace *)
-	| "/*"		{ comment lexbuf }           (* Comments *)
+	| "/*"		{ comment lexbuf }			(* Comments *)
 	| "//"		{ singleLineComment lexbuf }
 	| '('		{ LPAREN }
 	| ')'		{ RPAREN }
@@ -83,8 +83,8 @@ rule token = parse
 	| _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
 	
 and comment = parse
-  "*/" { token lexbuf }
-| _    { comment lexbuf }
+  "*/"	{ token lexbuf }
+| _		{ comment lexbuf }
 
 and singleLineComment = parse
  '\n'	{ token lexbuf }
