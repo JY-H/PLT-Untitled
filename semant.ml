@@ -132,6 +132,7 @@ let reserved_list =
 	let reserved = [
 		reserved_struct "print_string" (Void) ([Formal(String, "string_arg")]);
 		reserved_struct "print_int" (Void) ([Formal(Int, "int_arg")]);
+		reserved_struct "print_char" (Void) ([Formal(Char, "char_arg")]);
 		reserved_struct "print_float" (Void) ([Formal(Float, "float_arg")]);
 		reserved_struct "malloc" (CharArray(1)) ([Formal(Int, "size")]);
 		reserved_struct "cast" (Any) ([Formal(Any, "victim")]);
@@ -492,7 +493,12 @@ and check_cast env to_typ expr =
 				" to " ^ string_of_typ to_typ))
 			)
 		| Float -> (match to_typ with
-			  Float | Bool | Int | String  -> SCast(to_typ, sexpr)
+			  Float | Bool | Char | Int | String  -> SCast(to_typ, sexpr)
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| Char -> (match to_typ with
+			  Char | Bool | Int | Float -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)

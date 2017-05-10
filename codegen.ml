@@ -587,6 +587,7 @@ and continue_gen llbuilder loop_stack =
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id sexpr =
+	(*print_string "a\n";*)
 	let lst, ltyp, flag = match typ with
 		  A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
@@ -594,6 +595,7 @@ and local_var_gen llbuilder typ id sexpr =
                 | _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
+	(*print_string "b\n";*)
 
 	let alloc = L.build_alloca ltyp id llbuilder in
 	Hash.add local_values id alloc;
@@ -677,7 +679,8 @@ let class_gen s =
 
 let translate sprogram =
 	let _ = construct_library_functions in
-		let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) sprogram.classes else [] in
+	let classes = List.rev sprogram.classes in
+	let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) classes else [] in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
 	codegen_module

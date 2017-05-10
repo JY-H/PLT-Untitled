@@ -50,7 +50,6 @@ global_decls:
 		fdecls = $1 :: $2.fdecls } }
 
 cdecl:
-	/* TODO: possibly don't do interfaces because they'll be difficult */
 	  CLASS CLASSID LBRACE cbody RBRACE	{ {
 		cname = $2;
 		cbody = $4;
@@ -82,7 +81,7 @@ cbody:
 		methods = $1.methods } }
 	| cbody fdecl	{ {
 		fields = $1.fields;
-		methods = $2 :: $1.methods } }
+		methods = $1.methods @ [$2] } }
 
 fdecl:
 	ID LPAREN formals_opt RPAREN ARROW return_typ LBRACE stmt_list RBRACE
