@@ -1,0 +1,31 @@
+class Node {
+	int val;
+	Node left;
+	Node right;
+
+	Node(int val) -> Node {
+		self.val = val;
+	}
+}
+
+class Tree {
+	Node root;
+
+	Tree(int val) -> Tree {
+		self.root = Node(val);
+	}
+
+	change(int val) -> void {
+		Node curRoot = self.root;
+		curRoot.val = val;
+		self.root = curRoot;
+	}
+}
+
+main() -> int {
+	Tree a = Tree(5);
+	a.change(8);
+	Node root = a.root;
+	print_int(root.val);
+	return 0;
+}
