@@ -117,6 +117,7 @@ let add_env_block_const env id typ = {
 
 
 let global_func_map_ref = ref StringMap.empty
+let global_class_map_ref = ref StringMap.empty
 
 let reserved_list =
 (* Helper function to get all built-in functions. *)
@@ -243,7 +244,7 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 				} map
 		)
 	in List.fold_left map_class StringMap.empty cdecls
-		
+       
 let get_scdecl_from_cdecl class_maps sfdecls cdecl =
 	let class_map = StringMap.find cdecl.cname class_maps in
 	let field_list = StringMap.fold (fun _ v lst ->
@@ -433,6 +434,8 @@ and check_func_call env fname el obj_id =
     in
 		let global_func_map = !global_func_map_ref
 		in
+                let global_class_map = !global_class_map_ref
+                in
 	let sel, env = get_sexprl env el in
 	let check_param formal param =
 		let f_typ = match formal with
@@ -467,7 +470,7 @@ and check_func_call env fname el obj_id =
 		SCall(fname, actuals, the_func.return_typ), env)
 	with | Not_found ->
         try (
-                let cmap = try StringMap.find local_context env.env_class_maps
+                let cmap = try StringMap.find local_context global_class_map
                 with | Not_found -> raise(Failure("Class undefined " ^ local_context))
                 in
                 let the_func = StringMap.find full_name cmap.class_methods in
@@ -1085,5 +1088,6 @@ let check program = match program with
 		let global_func_map = get_global_func_map globals.fdecls reserved_map
 		in global_func_map_ref := global_func_map;
 		let class_maps = get_class_maps globals.cdecls reserved_map in
+                global_class_map_ref := class_maps;
 		let sast = get_sast class_maps reserved_list globals.cdecls globals.fdecls in
                 sast
