@@ -1,0 +1,11 @@
+main() -> int {
+	float f = <float> 65.0;
+	bool b = <bool> 65.0;
+	int i = <int> 65.0;
+	char c = <char> 65.0;
+
+	print_int(i);
+	print_string("\n");
+	print_char(c);
+	return 0;
+}

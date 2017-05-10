@@ -132,6 +132,7 @@ let reserved_list =
 	let reserved = [
 		reserved_struct "print_string" (Void) ([Formal(String, "string_arg")]);
 		reserved_struct "print_int" (Void) ([Formal(Int, "int_arg")]);
+		reserved_struct "print_char" (Void) ([Formal(Char, "char_arg")]);
 		reserved_struct "print_float" (Void) ([Formal(Float, "float_arg")]);
 		reserved_struct "malloc" (CharArray(1)) ([Formal(Int, "size")]);
 		reserved_struct "cast" (Any) ([Formal(Any, "victim")]);
@@ -150,7 +151,6 @@ let get_fully_qualified_name class_name fname = match fname with
 	| _ ->	if (class_name = "" || class_name = fname) then fname else class_name ^ "." ^ fname
 
 (* Put all global function declarations into a map *)
-(* if we keep reserved_map global, can rid of the second argument*)
 let get_global_func_map fdecls reserved_map =
 	let map_global_funcs map fdecl =
 		if (StringMap.mem fdecl.fname map) then
@@ -185,13 +185,11 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 		let map_functions map fdecl =
 			let func_full_name = get_fully_qualified_name cdecl.cname fdecl.fname
 			in
-                        (* be my guest to have duplicate functions; however, only
+                        (* allow duplicate functions; however, only
                          * the last declaration is picked up. Because we parse super
                          * super class before super class before child class, this means
                          * that child class can overwrite ancestors' declarations *)
-			if (*(StringMap.mem func_full_name map) then
-				raise (Failure(" duplicate function: " ^ func_full_name))
-			else if*) (StringMap.mem fdecl.fname reserved_map) then
+			if (StringMap.mem fdecl.fname reserved_map) then
 				raise (Failure(fdecl.fname ^ " is a reserved function."))
 			else
 				StringMap.add func_full_name fdecl map
@@ -201,8 +199,7 @@ let get_class_maps (*is_child*) cdecls reserved_map =
 			None -> ""
 			| Some str -> str
 		in
-                (* life could be much easier if we can do regex and replace
-                 * key in child class maps from parent.method to child.method *)
+                (* life could be much easier if we can do regex *)
                 let rec get_all_inherited_methods sclass_name lst =
                     let super_cdecl = List.filter (fun cdecl -> (cdecl.cname = sclass_name)) cdecls in
                     let super_cdecl = List.hd super_cdecl
@@ -273,8 +270,8 @@ let get_type_from_sexpr = function
 	| SUnop(_, _, t) -> t
 	| SAssign(_, _, t) -> t
 	| SCast(t, _) -> t
-	| SLstCreate(_, t) -> t
-	| SSeqAccess(_, _, _, t) -> t
+	| SArrayCreate(_, t) -> t
+	| SSeqAccess(_, _, t) -> t
 	| SFieldAccess(_, _, t) -> t
 	| SCall(_, _, t) -> t
 	| SMethodCall(_, _, _, t) -> t
@@ -307,7 +304,6 @@ and check_binop env expr1 op expr2 =
 			check_equality_op sexpr1 sexpr2 op typ1 typ2, env
 		| And | Or ->
 			check_logical_op sexpr1 sexpr2 op typ1 typ2, env
-		(* TODO: list/tuple ops *)
 		| _ -> raise(Failure("Operation " ^ string_of_op op ^
 			" not supported."))
 
@@ -333,8 +329,6 @@ and check_equality_op sexpr1 sexpr2 op typ1 typ2 = match op with
 			"used for types " ^
 			string_of_typ typ1 ^ " and " ^ string_of_typ typ2)))
 	| Req | Rneq -> (match typ1, typ2 with
-			(* Superclasses (and classes in general) don't exist so this should
-			be replaced*)
 		  ClassTyp(classname1), ClassTyp(classname2) ->
 			if classname1 = classname2 then
 				SBinop(sexpr1, op, sexpr2, Bool)
@@ -372,24 +366,13 @@ and check_unop env op expr =
 (* List assignment helpers *)
 (* Returns true if it is a list type *)
 and is_list typ = match typ with
-	  Lst(_) -> true
-	| _ -> false
-(* Returns true if it is an untyped list; false otherwise *)
-and is_untyped_list typ = match typ with
-	  Lst(Void) -> true
-	| Lst(inner_typ) -> is_untyped_list inner_typ
+	  ArrayTyp(_) -> true
 	| _ -> false
 
 (* Returns the level of nesting in the list *)
-and get_nesting_level typ = match typ with
-	  Lst(inner_typ) -> 1 + get_nesting_level inner_typ
-	| _ -> 0
-
-(* Check if the lhs is a list being assigned an empty list *)
-and valid_untyped_list_assign typ1 typ2 =
-	is_list typ1 &&
-	is_untyped_list typ2 &&
-	get_nesting_level typ2 <= get_nesting_level typ1
+and get_nesting_level lst = match lst with
+	  ArrayTyp(inner_typ) -> 1 + get_nesting_level inner_typ
+	| _ -> 1
 
 (* Check assignment, returns SAssign on success *)
 and check_assign env expr1 expr2 =
@@ -410,31 +393,12 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
-			(* Check if rhs is empty list and nesting level works *)
-			else if valid_untyped_list_assign typ1 typ2 then
-				(* Change untyped list to typed list *)
-				let typed_list = match sexpr2 with
-					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
-					| _ -> raise(Failure("Cannot assign " ^
-						(string_of_typ typ2) ^ " to " ^
-						(string_of_typ typ1) ^ "\n"))
-				in
-				SAssign(sexpr1, typed_list, typ1), env
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
-		| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, typ) ->
-			if typ1 = typ2 then
+		| SSeqAccess(_, index_sexpr, _) ->
+			if get_type_from_sexpr index_sexpr = Int && typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ1), env
-			else if valid_untyped_list_assign typ1 typ2 then
-				(* Change untyped list to typed list *)
-				let typed_list = match sexpr2 with
-					  SLstCreate(sexprs, _) -> SLstCreate(sexprs, typ1)
-					| _ -> raise(Failure("Cannot assign " ^
-						(string_of_typ typ2) ^ " to " ^
-						(string_of_typ typ1) ^ "\n"))
-				in
-				SAssign(sexpr1, typed_list, typ1), env
 			else
 				raise(Failure("Invalid sequence access assignment"))
 
@@ -449,7 +413,6 @@ and check_assign env expr1 expr2 =
 			(* Check types match *)
 			else if typ1 = typ2 then
 				SAssign(sexpr1, sexpr2, typ2), env
-			(* TODO for Kim: Check if empty list *)
 			else
 				raise(Failure("Cannot assign type " ^
 					string_of_typ typ2 ^ " to type " ^ string_of_typ typ1))
@@ -459,7 +422,7 @@ and check_assign env expr1 expr2 =
 and check_method_call env e fname el =
     let obj_id = match e with
           Id(id) -> id
-        | _ -> raise(Failure("unsupported chained call")) in (* later can process recursively for a.b.call() *)
+        | _ -> raise(Failure("unsupported chained call")) in (* can process recursively for chained calls *)
     check_func_call env fname el obj_id
 
 (* func and method call; obj_id used to distinguish: if funcCall, obj_id = "", if methodCall, obj_id = id of that obj *)
@@ -530,7 +493,12 @@ and check_cast env to_typ expr =
 				" to " ^ string_of_typ to_typ))
 			)
 		| Float -> (match to_typ with
-			  Float | Bool | Int | String  -> SCast(to_typ, sexpr)
+			  Float | Bool | Char | Int | String  -> SCast(to_typ, sexpr)
+			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
+				" to " ^ string_of_typ to_typ))
+			)
+		| Char -> (match to_typ with
+			  Char | Bool | Int | Float -> SCast(to_typ, sexpr)
 			| _ -> raise(Failure("Cannot cast " ^ string_of_typ from_typ ^
 				" to " ^ string_of_typ to_typ))
 			)
@@ -539,67 +507,51 @@ and check_cast env to_typ expr =
 	in
 	scast, env
 
-(* Check list creation *)
-and check_lst_create env exprs =
-	(* Convert list of exprs to list of sexprs *)
-	let sexprs = List.map
-		(fun expr -> fst (get_sexpr env expr)) exprs in
-
+and check_lst_create env typ exprs =
+    let sexprs, env = get_sexprl env exprs in  
 	(* Check that the types of all sexprs match *)
-	let rec check_elem_types sexprs = match sexprs with
+	let rec check_elem_typ sexprs = match sexprs with
 		  [] -> ()
-		| [_] -> ()
-		(* Has >1 elem, check all elems match *)
-		| head :: next :: tail ->
+		| head :: tail ->
 			let typ1 = get_type_from_sexpr head in
-			let typ2 = get_type_from_sexpr next in
-			if typ1 <> typ2 then (
-				(* Type-mismatched elems found *)
-				raise(Failure("Mismatched types found in list")))
+			if typ1 <> Int then (
+				raise(Failure("Array dimensions must be int")))
 			else
 				(* Check rest of list *)
-				check_elem_types (next :: tail)
+				check_elem_typ (tail)
+	in check_elem_typ sexprs;
+
+	let rec nested_array_typ exprs = match exprs with
+		  [] -> typ
+		| _ :: tail -> ArrayTyp(nested_array_typ tail)
 	in
-	check_elem_types sexprs;
+	(* Make array of type *)
+	SArrayCreate(sexprs, nested_array_typ exprs), env
 
-	(* Make list of type *)
-	if List.length sexprs > 0 then
-		(* Typed list *)
-		let typ = get_type_from_sexpr (List.hd sexprs) in
-		SLstCreate(sexprs, Lst(typ)), env
-	else
-		(* Untyped empty list *)
-		(* TODO: handle typeless lists specially *)
-		SLstCreate(sexprs, Lst(Void)), env
-
-and check_seq_access env lst_expr start_expr end_expr =
+and check_seq_access env lst index =
 	(* Check first expr is a list, second and third are ints *)
-	let lst_sexpr, _ = get_sexpr env lst_expr in
+	let lst_sexpr, _ = get_sexpr env lst in
 	let lst_typ = get_type_from_sexpr lst_sexpr in
-	let start_sexpr, _ = get_sexpr env start_expr in
-	let start_typ = get_type_from_sexpr start_sexpr in
-	let end_sexpr, _ = get_sexpr env end_expr in
-	let end_typ = get_type_from_sexpr end_sexpr in
-	let check_access_types = match lst_typ, start_typ, end_typ with
-		  Lst(_), Int, Int | Lst(_), Int, Void -> true
+	let index_sexpr, _ = get_sexpr env index in
+	let index_typ = get_type_from_sexpr index_sexpr in
+	let check_access_types = match lst_typ, index_typ with
+		  ArrayTyp(_), Int -> true
 		| _ -> false
 	in
 
 	(* Unwrap type from list *)
 	let typ = get_type_from_sexpr lst_sexpr in
 	let typ = match typ with
-	  Lst(t) -> t
-	| _ -> raise(Failure("Invalid sequence access."))
+		  ArrayTyp(t) -> t
+		| _ -> raise(Failure("Invalid sequence access."))
 	in
 
 	if not check_access_types then
 		(* Invalid type used in sequence access *)
 		raise(Failure("Invalid type used in sequence access: " ^
-		(string_of_typ lst_typ) ^ " " ^
-		(string_of_typ start_typ) ^ " " ^
-		(string_of_typ end_typ)))
+		(string_of_typ lst_typ)))
 	else
-		SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, typ), env
+		SSeqAccess(lst_sexpr, index_sexpr, typ), env
 
 and check_field_access env obj field =
 	(* Find class exists *)
@@ -672,18 +624,16 @@ and get_sexpr env expr = match expr with
 	| Unop(op, e) -> check_unop env op e
 	| Assign(e1, e2) -> check_assign env e1 e2
 	| Cast(t, e) -> check_cast env t e
-	| LstCreate(exprs) -> check_lst_create env exprs
-	| SeqAccess(lst_expr, start_expr, end_expr) -> 
-		check_seq_access env lst_expr start_expr end_expr
+	| ArrayCreate(t, exprs) -> check_lst_create env t exprs
+	| SeqAccess(lst_expr, index) -> 
+		check_seq_access env lst_expr index
 	| FieldAccess(classid, field) -> check_field_access env classid field
 	| MethodCall(e, str, el) -> check_method_call env e str el
-	(* does not work on class whose field is a class e.g. a.b.method(), fixable by recursively processing e in check_func_call *)
 	| FuncCall(str, el) -> check_func_call env str el ""
 	| ObjCreate(t, el) -> check_object_create env t el
 	| Self -> SId("self", ClassTyp(env.env_name)), env
-(*			  | Super*)
 	| Noexpr -> SNoexpr, env
-	| _ -> raise(Failure("cannot convert to sexpr")) (*dummy, delete later*)
+	| _ -> raise(Failure("cannot convert to sexpr"))
 
 (* Looks up the type of a variable/constant *)
 and get_id_typ env id =
@@ -776,7 +726,6 @@ and check_for env expr1 expr2 expr3 stmts =
 	let sexpr2, _ = get_sexpr new_env expr2 in
 	let sexpr3, _ = get_sexpr new_env expr3 in
 	let sstmts, _ = get_sstmt new_env stmts in
-	(* TODO: do we allow vampire loops, i.e. for(;;) *)
 	SFor(sexpr1, sexpr2, sexpr3, sstmts), env
 
 and check_while env expr stmts =
@@ -845,7 +794,7 @@ and check_local_var env typ id expr =
 			| _ -> add_env_block_local env id typ
 		in
 		let sexpr, env = get_sexpr env expr in
-		let sexpr_typ = get_type_from_sexpr sexpr in
+		let _ = get_type_from_sexpr sexpr in
 		(* If object type, check class name exists *)
 		match typ with
 			  ClassTyp(classname) ->
@@ -857,22 +806,12 @@ and check_local_var env typ id expr =
 				  SNoexpr -> SLocalVar(typ, id, sexpr), env
 				| _ ->
 					(* Check types match *)
-					let typ_expr = get_type_from_sexpr sexpr in
-					if typ = typ_expr then
+					let typ_sexpr = get_type_from_sexpr sexpr in
+					if typ = typ_sexpr then
 						SLocalVar(typ, id, sexpr), env
-					(* Check if assigning a list an untyped list *)
-					else if valid_untyped_list_assign typ sexpr_typ then
-						let typed_list = match sexpr with
-							  SLstCreate(sexprs, _) ->
-								SLstCreate(sexprs, typ)
-							| _ -> raise(Failure("Cannot assign " ^
-								(string_of_typ sexpr_typ) ^ " to " ^
-								(string_of_typ typ) ^ "\n"))
-						in
-						SLocalVar(typ, id, typed_list), env
 					else
 						raise(Failure("Declared type of " ^ id ^
-						" and assignment type " ^ (string_of_typ) typ_expr ^
+						" and assignment type " ^ string_of_typ typ_sexpr ^
 						" do not match"))
 				)
 				
@@ -925,10 +864,6 @@ and get_sstmt env stmt = match stmt with
 	| Continue -> check_continue env
 	| LocalVar(typ, id, expr) -> check_local_var env typ id expr
 	| LocalConst(typ, id, expr) -> check_local_const env typ id expr
-(*			  | TryCatch
-	|
-	| Throw
-	*)
 	| _ -> raise(Failure("Idk what stmt you are talking abt"))
 
 and get_sstmtl env stmtl =
@@ -1021,7 +956,7 @@ let get_constructor_from_fdecl cname fdecl env =
     let class_typ = ClassTyp(cname) in
     let init_self = [SLocalVar(class_typ, "self",
         SCall("cast", 
-            [SCall("malloc", [SIntLit(100)], CharArray(100))], (*100 dummy, should be sizeof*)
+            [SCall("malloc", [SCall("sizeof", [SId("dummy", class_typ)], Int)], CharArray(1))],
             class_typ))]
     in
     let env = {
@@ -1108,7 +1043,7 @@ let get_sast class_maps reserved cdecls fdecls  =
             try let _ = List.find is_func_constructor scmethods
             in
             scmethods
-            (* only when a class called Main it does not need to have constructor, or if this is too janky we can get rid of the check entirely *)
+            (* only when a class called Main it does not need to have constructor *)
             with | Not_found -> if cons_name = "Main" then scmethods else raise(Failure("This class has no constructor"))
         in
         let get_all_methods cname =

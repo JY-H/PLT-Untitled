@@ -1,0 +1,118 @@
+class Bank_Acct {
+	string owner;
+	float balance;
+	float interest;
+
+	Bank_Acct(string o, float b, float i) -> Bank_Acct {
+		self.owner = o;
+		self.balance = b;
+		self.interest = i;
+	}
+
+	acct_summary() -> void {
+		print_string(self.owner);
+		print_string("\'s account earns ");
+		print_float(self.interest);
+		print_string(" interest and currently has a balance of $");
+		print_float(self.balance);
+		print_string(".\n");
+	}
+
+	deposit(float money) -> void {
+		if (money < 0.0) {
+			print_string("Value cannot be negative.\n");
+		} else {
+			float new_balance = self.balance + money;
+			self.balance = new_balance;
+			print_string(self.owner);
+			print_string("\'s new balance is now: $");
+			print_float(self.balance);
+			print_string(".\n");
+		}
+	}
+
+	withdraw(float money) -> void {
+		if (money < 0.0) {
+			print_string("Value cannot be negative.\n");
+		} else {
+			float new_balance = self.balance - money;
+			if (new_balance < 0.0) {
+				print_string("Cannot withdraw this much.\n");
+			} else {
+				self.balance = new_balance;
+				print_string(self.owner);
+				print_string("\'s new balance is now: $");
+				print_float(self.balance);
+				print_string(".\n");
+			}
+		}
+	}
+
+	calc_interest() -> void {
+		self.balance = self.balance * (1.0 + self.interest);
+		print_string("After interest, ");
+		print_string(self.owner);
+		print_string("\'s new balance is now: $");
+		print_float(self.balance);
+		print_string(".\n");
+	}
+}
+
+// when balance on card is negative, indicates amount owed
+class Credit_Card extends Bank_Acct {
+	float minimum_payment;
+
+	Credit_Card (string o, float b, float i, float mp) -> Credit_Card {
+		self.owner = o;
+		self.balance = b;
+		self.interest = i;
+		self.minimum_payment = mp;
+	}
+
+	pay(float money) -> void {
+		if (money < self.minimum_payment) {
+			print_string("Payment must be greater than $");
+			print_float(self.minimum_payment);
+			print_string(".\n");
+		} else {
+			float new_balance = self.balance + money;
+			self.balance = new_balance;
+			print_string(self.owner);
+			print_string("\'s new balance is now: $");
+			print_float(self.balance);
+			print_string(".\n");
+		}
+	}
+}
+
+main() -> int {
+	Bank_Acct acct0 = Bank_Acct("Terrence", 500.00, 0.01);
+	Bank_Acct acct1 = Bank_Acct("Aly", 500.00, 0.025);
+	Bank_Acct acct2 = Bank_Acct("Clara", 500.00, 0.05);
+
+	Credit_Card card0 = Credit_Card("Holly", -200.89, 0.12, 24.32);
+	Credit_Card card1 = Credit_Card("Darren", -1000.34, 0.10, 40.13);
+
+	[Bank_Acct] accounts = [Bank_Acct, 3];
+	accounts[0] = acct0;
+	accounts[1] = acct1;
+	accounts[2] = acct2;
+	[Credit_Card] cards = [Credit_Card, 2];
+	cards[0] = card0;
+	cards[1] = card1;
+
+	int i = 0;
+	for (i = 0; i < 3; i = i + 1) {
+		Bank_Acct temp = accounts[i];
+		temp.acct_summary();
+	}
+	for (i = 0; i < 3; i = i + 1) {
+		Bank_Acct temp = accounts[i];
+		temp.calc_interest();
+	}
+	for (i = 0; i < 2; i = i + 1) {
+		Credit_Card temp = cards[i];
+		temp.pay(25.22);
+	}
+	return 0;
+}

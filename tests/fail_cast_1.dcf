@@ -1,4 +1,0 @@
-main() -> int {
-	int i = <int> "Hi";
-	return -1;
-}

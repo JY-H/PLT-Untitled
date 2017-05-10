@@ -50,7 +50,6 @@ global_decls:
 		fdecls = $1 :: $2.fdecls } }
 
 cdecl:
-	/* TODO: possibly don't do interfaces because they'll be difficult */
 	  CLASS CLASSID LBRACE cbody RBRACE	{ {
 		cname = $2;
 		cbody = $4;
@@ -82,7 +81,7 @@ cbody:
 		methods = $1.methods } }
 	| cbody fdecl	{ {
 		fields = $1.fields;
-		methods = $2 :: $1.methods } }
+		methods = $1.methods @ [$2] } }
 
 fdecl:
 	ID LPAREN formals_opt RPAREN ARROW return_typ LBRACE stmt_list RBRACE
@@ -108,8 +107,7 @@ formal_list:
 
 typ:
 	  primitive { $1 }
-	| list_typ	{ $1 }
-	| tuple_typ	{ $1 }
+	| array_typ	{ $1 }
 	| obj_typ	{ $1 }
 
 return_typ:
@@ -123,11 +121,8 @@ primitive:
 	| STRING	{ String }
 	| FLOAT		{ Float }
 
-list_typ:
-	LBRACK typ RBRACK	{ Lst($2) }
-
-tuple_typ:
-	LPAREN typ RPAREN	{ Tuple($2) }
+array_typ:
+	LBRACK typ RBRACK	{ ArrayTyp($2) }
 
 obj_typ:
 	CLASSID				{ ClassTyp($1) }
@@ -222,8 +217,8 @@ expr:
 	| LT typ GT expr	{ Cast($2, $4) }
 	| expr ASSIGN expr	{ Assign($1, $3) }
 	| LPAREN expr RPAREN	{ $2 }
-	| sequence	{ $1 }
-	| expr sequence_access	{ SeqAccess($1, fst $2, snd $2) }
+	| sequence	{ ArrayCreate(fst $1, snd $1) }
+	| expr sequence_access	{ SeqAccess($1, $2) }
 	| expr DOT ID	{ FieldAccess($1, Id($3)) }
 	| ID LPAREN actuals_opt RPAREN	{ FuncCall($1, $3) }
 	| expr DOT ID LPAREN actuals_opt RPAREN	{ MethodCall($1, $3, $5) }
@@ -242,22 +237,12 @@ lits:
 	| NULL				{ Null }
 
 sequence:
-	  LPAREN expr COMMA tuple_elems	{ TupleCreate($2 :: $4) }
-	| LBRACK list_elems		{ LstCreate($2) }
-
-tuple_elems:
-	  RPAREN					{ [] }
-	| expr RPAREN				{ [$1] }
-	| expr COMMA tuple_elems	{ $1 :: $3 }
-
-list_elems:
-	  expr RBRACK	{ [$1] }
-	| RBRACK	{ [] }
-	| expr COMMA list_elems	{ $1 :: $3 }
+	  LBRACK sequence COMMA expr RBRACK		{ (fst $2, $4 :: (snd $2)) }
+	| LBRACK primitive COMMA expr RBRACK	{ ($2, [$4]) }
+	| LBRACK obj_typ COMMA expr RBRACK		{ ($2, [$4]) }
 
 sequence_access:
-	  LBRACK expr RBRACK	{ ($2, Noexpr) }
-	| LBRACK expr SNGCOLON expr RBRACK	{ ($2, $4) }
+	  LBRACK expr RBRACK	{ $2 }
 
 vdecl:
 	  typ ID SEMI	{ ObjVar($1, $2, Noexpr) }

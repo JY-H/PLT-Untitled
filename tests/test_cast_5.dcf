@@ -1,6 +1,14 @@
 main() -> int {
-	float f = <float> 5.0;
-	bool b = <bool> 5.0;
-	int i = <int> 5.0;
+	// Test char conversion
+	char c = <char> 65;
+	int i = <int> c;
+	float f = <float> c;
+
+	print_char(c);
+	print_string("\n");
+	print_int(i);
+	print_string("\n");
+	print_float(f);
+
 	return 0;
 }

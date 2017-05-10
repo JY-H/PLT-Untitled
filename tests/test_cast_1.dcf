@@ -1,4 +1,15 @@
 main() -> int {
-	int i = <int> 4.0;
+	// Test bool conversions
+	bool b = <bool> true;
+	int i = <int> true;
+	float f = <float> true;
+	char c = <char> ((<int> true) + 64);
+
+	print_int(i);
+	print_string("\n");
+	print_float(f);
+	print_string("\n");
+	print_char(c);
+
 	return 0;
 }

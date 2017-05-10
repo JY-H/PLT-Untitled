@@ -48,8 +48,7 @@ let rec get_llvm_type = function
 	| A.Void -> void_t
 	| A.String -> str_t
 	| A.Null_t -> i32_t
-	(* TODO: Add tuple/list types *)
-	| A.Lst(typ) -> L.pointer_type (get_llvm_type typ)
+	| A.ArrayTyp(typ) -> L.pointer_type (get_llvm_type typ)
 	| A.ClassTyp(name) -> L.pointer_type(find_global_class name)
 	| _ -> raise(Failure("Type not yet supported."))
 
@@ -82,7 +81,7 @@ and string_gen llbuilder s =
 	L.build_global_stringptr s "tmp" llbuilder
 
 and sstmt_gen llbuilder loop_stack = function
-	(* NOTE: this requires a function body to be non-empty, is this ok? *)
+	(* NOTE: this requires a function body to be non-empty *)
 	  SBlock(stmts) -> List.hd(List.map (sstmt_gen llbuilder loop_stack) stmts)
 	| SExpr(sexpr, _) -> sexpr_gen llbuilder sexpr
 	| SReturn(sexpr, _) -> ret_gen llbuilder sexpr
@@ -111,21 +110,19 @@ and sexpr_gen llbuilder = function
 		unop_gen llbuilder op sexpr typ
 	| SAssign(sexpr1, sexpr2, typ) -> assign_gen llbuilder sexpr1 sexpr2 typ
 	| SCast(to_typ, sexpr) -> cast_gen llbuilder to_typ sexpr
-	| SLstCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
-	| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, _) ->
-		seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr false
+	| SArrayCreate(sexprl, typ) -> lst_create_gen llbuilder typ sexprl
+	| SSeqAccess(lst_sexpr, index, _) ->
+		seq_access_gen llbuilder lst_sexpr index false
 	| SFieldAccess(c, rhs, _) -> field_access_gen llbuilder c rhs true
 	| SCall(fname, sexpr_list, stype) -> call_gen llbuilder fname sexpr_list stype
 	| SMethodCall(sexpr, fname, sexpr_list, stype) -> method_call_gen llbuilder sexpr fname sexpr_list stype (* difference is insert self as the first argument *)
 	| SObjCreate(typ, sexprl) -> obj_create_gen llbuilder typ sexprl
 	| SNoexpr -> L.const_int i32_t 0
-	| _ -> raise(Failure("Expression type not recognized.")) 
 
 and binop_gen llbuilder sexpr1 op sexpr2 typ =
 	let lexpr1 = sexpr_gen llbuilder sexpr1 in
 	let lexpr2 = sexpr_gen llbuilder sexpr2 in
 
-	(* KILL_ME: kill this if unused by end of project *)
 	let typ1 = get_type_from_sexpr sexpr1 in
 	let typ2 = get_type_from_sexpr sexpr2 in
 
@@ -142,7 +139,7 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| A.Greater -> L.build_icmp L.Icmp.Sgt expr1 expr2 "int_greatertmp" llbuilder
 		| A.Geq -> L.build_icmp L.Icmp.Sge expr1 expr2 "int_geqtmp" llbuilder
 				| A.And -> L.build_and expr1 expr2 "int_andtmp" llbuilder
-				(*I think several others are missing, like or*)
+                                | A.Or -> L.build_or expr1 expr2 "int_ortmp" llbuilder
 		| _ -> raise(Failure("Unsupported operator for integers"))
 	in
 	
@@ -161,8 +158,6 @@ and binop_gen llbuilder sexpr1 op sexpr2 typ =
 		| _ -> raise(Failure("Unsupported operator for floats"))
 	in
 
-	(* TODO: do something for req/rneq here *)
-	
 	match typ with
 		  A.Int -> int_ops lexpr1 op lexpr2
 		| A.Float -> float_ops lexpr1 op lexpr2
@@ -189,20 +184,15 @@ and unop_gen llbuilder unop sexpr typ =
 		| _ -> raise(Failure("Invalid type for unop: " ^ A.string_of_typ typ))
 
 and cast_gen llbuilder to_typ sexpr =
-	(* TODO: check this is legit *)
 	let lexpr = sexpr_gen llbuilder sexpr in
 	let from_typ = get_type_from_sexpr sexpr in
 	match from_typ with
 		  A.Bool -> (
 			match to_typ with
 			  A.Bool -> lexpr
+			| A.Char -> L.build_zext lexpr i8_t "bool_char_cast" llbuilder
 			| A.Int -> L.build_zext lexpr i32_t "bool_int_cast" llbuilder
-			(* NOTE: questionable implementation *)
 			| A.Float -> L.build_uitofp lexpr f_t "bool_float_cast" llbuilder
-			(* NOTE: non-working implementation unless arrays are used *)
-			(*| String ->
-				L.build_global_stringptr (A.string_of_lval lexpr)
-				"bool_string_cast" llbuilder*)
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
@@ -212,51 +202,40 @@ and cast_gen llbuilder to_typ sexpr =
 				let zero = L.const_int i32_t 0 in
 				L.build_icmp L.Icmp.Ne lexpr zero "int_bool_cast" llbuilder
 			| A.Char -> L.build_trunc lexpr i8_t "int_char_cast" llbuilder
-			(* NOTE: questionable implementation *)
 			| A.Float -> L.build_sitofp lexpr f_t "int_float_cast" llbuilder
-			(* NOTE: non-working implementation unless arrays are used *)
-			(*| String
-				L.build_global_stringptr (A.string_of_lval lexpr)
-				"int_string_cast" llbuilder*)
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
 		| A.Float -> (match to_typ with
 			  A.Float -> lexpr
+			| A.Char -> L.build_fptoui lexpr i8_t "float_char_cast" llbuilder
 			| A.Bool ->
 				let zero = L.const_float f_t 0.0 in
 				L.build_fcmp L.Fcmp.One lexpr zero "float_bool_cast" llbuilder
-			(* NOTE: questionable implementation *)
 			| A.Int -> L.build_fptosi lexpr i32_t "float_int_cast" llbuilder
-			(* NOTE: non-working implementation unless arrays are used *)
-			(*| A.String ->
-				L.build_global_stringptr (A.string_of_lval lexpr)
-				"float_string_cast" llbuilder*)
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
 		| A.Char -> (match to_typ with
 			  A.Char -> lexpr
+			| A.Bool ->
+				let zero = L.const_int i8_t 0 in
+				L.build_icmp L.Icmp.Ne lexpr zero "char_bool_cast" llbuilder
 			| A.Int -> L.build_zext lexpr i32_t "char_int_cast" llbuilder
-			(* TODO: string conversion when strings exist *)
+			| A.Float -> L.build_uitofp lexpr f_t "char_float_cast" llbuilder
 			| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 				" to " ^ A.string_of_typ to_typ))
 			)
-		(* TODO; string conversion when strings exist *)
 		| _ -> raise(Failure("Invalid cast from " ^ A.string_of_typ from_typ ^
 			" to " ^ A.string_of_typ to_typ))
-	(* TODO: cast objects when objects are a thing *)
 
 (* Assignment instruction generation *)
 and assign_gen llbuilder sexpr1 sexpr2 typ =
-	(* KILL_ME: kill this if unused by end of project *)
-	(*let rhs_typ = get_type_from_sexpr sexpr2 in*)
 
 	let lhs, is_obj_access = match sexpr1 with
 		  SId(id, _) -> id_gen llbuilder id false, false
-		(* TODO: add functionality  for tuples, etc. *)
-		| SSeqAccess(lst_sexpr, start_sexpr, end_sexpr, _) ->
-			seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr true, false
+		| SSeqAccess(lst_sexpr, index,  _) ->
+			seq_access_gen llbuilder lst_sexpr index true, true
 		| SFieldAccess(id, field, _) -> field_access_gen llbuilder id field false, true
 		| _ -> raise(Failure("Unable to assign."))
 	in
@@ -282,29 +261,28 @@ and assign_gen llbuilder sexpr1 sexpr2 typ =
 	ignore(L.build_store rhs lhs llbuilder);
 	rhs
 
-(* written only for 1D lists atm
- * multiple dimensions may work since LstCreate is processed recursively? llvm code looks kinda promising, but we can only tell after access is implemented *)
-(* I don't think we should mul here; build_array_malloc should malloc len * sizeof(typ) it seems from llvm code generated *)
-and lst_create_gen llbuilder t sexprl =
-	let len_real = L.const_int i32_t ((List.length sexprl) + 1) in
-	let typ = get_llvm_type t in
-	let lst = L.build_array_malloc typ len_real "tmp" llbuilder in
-	let lst = L.build_pointercast lst typ "tmp"
+and lst_create_gen llbuilder typ sexprl =
+        let e = List.hd sexprl in
+        let t = get_llvm_type typ in
+        let size = sexpr_gen llbuilder e in
+        let size_t = L.build_intcast (L.size_of t) i32_t "tmp" llbuilder in
+        let size = L.build_mul size_t size "tmp" llbuilder in
+        let size_real = L.build_add size (L.const_int i32_t 1) "tmp" llbuilder in
+	let arr = L.build_array_malloc t size_real "tmp" llbuilder in
+	let arr = L.build_pointercast arr t "tmp"
 	llbuilder in
-	let llvalues = List.map (sexpr_gen llbuilder) sexprl in
-	List.iteri (fun i llval -> let ptr = L.build_gep lst [|(L.const_int i32_t (i+1))|] "tmp"
-	llbuilder in
-	ignore(L.build_store llval ptr llbuilder); ) llvalues;
-	lst
+        (* store this dimension *)
+        let arr_len_ptr = L.build_pointercast arr (L.pointer_type i32_t) "tmp" llbuilder in
+        ignore(L.build_store size_real arr_len_ptr llbuilder);
+        arr
 
 (* Access a list *)
-and seq_access_gen llbuilder lst_sexpr start_sexpr end_sexpr is_assign =
+and seq_access_gen llbuilder lst_sexpr index is_assign =
 	let lst = sexpr_gen llbuilder lst_sexpr in
-	let start_index = sexpr_gen llbuilder start_sexpr in
-	(* TODO: list splicing *)
-	let start_index = L.build_add start_index (L.const_int i32_t 1) "list_index"
+	let sindex = sexpr_gen llbuilder index in
+	let sindex = L.build_add sindex (L.const_int i32_t 1) "list_index"
 		llbuilder in
-	let _val = L.build_gep lst [| start_index |] "list_access" llbuilder in
+	let _val = L.build_gep lst [| sindex |] "list_access" llbuilder in
 	if is_assign then
 		_val
 	else
@@ -394,11 +372,18 @@ and func_call_gen llbuilder fname sexprl stype =
 and call_gen llbuilder fname sexprl stype =
 		match fname with
 				(* full list of built-in and linked functions just for clarity*)
-				 "print_string" | "print_int" | "print_float" ->
+				 "print_string" | "print_int" | "print_float" | "print_char" ->
 					print_gen llbuilder sexprl
 				| "malloc" -> func_call_gen llbuilder fname sexprl stype
 				| "cast" -> cast_malloc_gen llbuilder sexprl stype
+                                | "sizeof" -> sizeof_gen llbuilder sexprl
 				| _ -> func_call_gen llbuilder fname sexprl stype
+
+and sizeof_gen llbuilder el =
+        let typ = Se.get_type_from_sexpr (List.hd el) in
+        let typ = get_llvm_type typ in
+        let size = L.size_of typ in
+        L.build_bitcast size i32_t "tmp" llbuilder
 
 (* Helper method to generate print function for strings. *)
 and print_gen llbuilder sexpr_list =
@@ -409,7 +394,7 @@ and print_gen llbuilder sexpr_list =
 		  A.Int -> "%d"
 		| A.Float -> "%f"
 		| A.String -> "%s"
-		(* char ?? *)
+		| A.Char -> "%c"
 		| _ -> raise (Failure("cannot print type " ^ A.string_of_typ typ))
 	in
 	let format_str = List.fold_left (fun s t -> s ^ get_format t) "" param_types in
@@ -432,9 +417,6 @@ and ret_gen llbuilder sexpr =
 			L.build_ret (sexpr_gen llbuilder sexpr) llbuilder
 
 and if_gen llbuilder loop_stack if_sexpr if_sstmts elseifs else_sstmts =
-	(* if expr *)
-	(* KILL_ME *)
-	(*let if_lexpr = sexpr_gen llbuilder if_sexpr in*)
 
 	(* Initial bb *)
 	let start_bb = L.insertion_block llbuilder in
@@ -605,13 +587,15 @@ and continue_gen llbuilder loop_stack =
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id sexpr =
+	(*print_string "a\n";*)
 	let lst, ltyp, flag = match typ with
 		  A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
 			find_global_class classname, false
-		| _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
+                | _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
+	(*print_string "b\n";*)
 
 	let alloc = L.build_alloca ltyp id llbuilder in
 	Hash.add local_values id alloc;
@@ -693,15 +677,10 @@ let class_gen s =
 	let res = List.map (fun f -> func_body_gen f) s.scbody.smethods in
 		res
 
-
-(*TBA: probably needed when inheritance happens
-let vtbl_gen scdecls =
-			*)
-
 let translate sprogram =
 	let _ = construct_library_functions in
-		let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) sprogram.classes else [] in
+	let classes = List.rev sprogram.classes in
+	let _ = if (List.length sprogram.classes > 0) then List.map (fun s -> class_gen s) classes else [] in
 	let _ = List.map (fun f -> func_stub_gen f) sprogram.functions in
 	let _ = List.map (fun f -> func_body_gen f) sprogram.functions in
-		(*		  let _ = vtbl_gen sprogram.classes in*)
 	codegen_module
