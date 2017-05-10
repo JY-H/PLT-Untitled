@@ -165,8 +165,7 @@ let get_global_func_map fdecls reserved_map =
 
 
 (* Collect all class internals into a map as class_map's *)
-let get_class_maps (*is_child*) cdecls reserved_map =
-	(*let dependent_list = [] in*)
+let get_class_maps cdecls reserved_map =
 	let map_class map cdecl =
 		(* Map all fields, const and non-const. *)
 		let map_fields map = function
@@ -867,7 +866,7 @@ and get_sstmt env stmt = match stmt with
 	| Continue -> check_continue env
 	| LocalVar(typ, id, expr) -> check_local_var env typ id expr
 	| LocalConst(typ, id, expr) -> check_local_const env typ id expr
-	| _ -> raise(Failure("Idk what stmt you are talking abt"))
+	| _ -> raise(Failure("unrecognized statement"))
 
 and get_sstmtl env stmtl =
 	let env_ref = ref(env) in

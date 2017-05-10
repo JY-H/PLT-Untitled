@@ -331,7 +331,7 @@ and cast_malloc_gen llbuilder sexprl stype =
 	let cast_malloc llbuilder lhs newTyp =
 		match newTyp with
 			A.ClassTyp(c) -> let obj_llvm_typ = get_llvm_type (A.ClassTyp(c)) in L.build_pointercast lhs obj_llvm_typ "tmp" llbuilder
-		| _ as c -> raise(Failure("RIP cannot cast to " ^ A.string_of_typ c))
+		| _ as c -> raise(Failure("Cannot cast to " ^ A.string_of_typ c))
 	in
 	let sexpr = List.hd sexprl in
 	let lhs = match sexpr with
@@ -587,7 +587,6 @@ and continue_gen llbuilder loop_stack =
 
 (* Generates a local variable declaration *)
 and local_var_gen llbuilder typ id sexpr =
-	(*print_string "a\n";*)
 	let lst, ltyp, flag = match typ with
 		  A.ClassTyp(classname) -> (L.build_add (L.const_int i32_t 0)
 			(L.const_int i32_t 0) "nop" llbuilder),
@@ -595,7 +594,6 @@ and local_var_gen llbuilder typ id sexpr =
                 | _ -> (L.build_add (L.const_int i32_t 0) (L.const_int i32_t 0)
 			"nop" llbuilder), get_llvm_type typ, false
 	in
-	(*print_string "b\n";*)
 
 	let alloc = L.build_alloca ltyp id llbuilder in
 	Hash.add local_values id alloc;

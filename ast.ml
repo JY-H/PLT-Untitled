@@ -1,7 +1,5 @@
 (* Abstract Syntax Tree and functions for printing it *)
 
-(*open Char*)
-
 type op = Add | Sub | Mult | Div | Mod | Req | Veq | Rneq | Vneq | Less | Leq |
 	Greater | Geq | And | Or | In | Append | Concat
 
@@ -10,7 +8,6 @@ type uop = Neg | Not | Remove
 type typ = Int | Float | Bool | Char | String | Void | Null_t | Any |
 	Tuple of typ | ArrayTyp of typ | ClassTyp of string | CharArray of int
 
-(* typ ID, e.g. int x, int[] y *)
 type formal_param = Formal of typ * string
 
 type classid_list = string list
@@ -59,7 +56,6 @@ type func_decl = {
 	return_typ: typ;
 	fname: string;
 	formals: formal_param list;
-	(* locals: local list; *)
 	body: stmt list;
 }
 

@@ -101,6 +101,7 @@ main() -> int {
 	// Test fill()
 	lst1.fill(lst1.capacity);
 
+	print_string("Testing add: \n");
 	// Test set
 	int i;
 	for (i = 0; i < lst1.size; i = i + 1) {
@@ -113,6 +114,7 @@ main() -> int {
 
 	ArrayList lst2 = ArrayList(len);
 
+	print_string("Testing set: \n");
 	// Test set()
 	for (i = 0; i < lst1.size; i = i + 1) {
 		if (i >= lst2.size) {
@@ -124,6 +126,7 @@ main() -> int {
 	// 0 1 2 3
 	lst2.print();
 
+	print_string("Testing more add: \n");
 	// Test add()
 	for (i = 0; i < 10; i = i + 1) {
 		lst2.add(i * 100);
@@ -141,6 +144,7 @@ main() -> int {
 	// 0 2 4 6 8 10 12
 	lst3.print();
 
+	print_string("Testing remove: \n");
 	// Test remove()
 	for (i = lst3.size - 1; i >= 0; i = i - 1) {
 		int index = lst3.get(i);
